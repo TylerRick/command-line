@@ -1,0 +1,248 @@
+#!/usr/bin/ruby
+# Copyright 2008 Tyler Rick
+# License: GPL
+
+require 'rubygems'
+require 'getoptlong'
+require 'facets/time'
+require 'colored'
+
+opts = GetoptLong.new(
+    [ '--hourly',                       GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--daily',                        GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--weekly',                       GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--monthly',                      GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--yearly',                       GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--use-filename-timestamp',       GetoptLong::NO_ARGUMENT ],
+    [ '--use-file-system-timestamp',    GetoptLong::NO_ARGUMENT ],
+    [ '--time-format',                  GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--pattern',                      GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--exclude',                      GetoptLong::REQUIRED_ARGUMENT ]
+)
+
+def help
+  puts <<End
+Synopsis:
+---------
+
+rm_extra_copies [--hourly=n] [--daily=n] [--weekly=n] [--monthly=n] dirs...
+
+rm_extra_copies will keep the specified number of time-stamped copies from each "time bucket" and remove all older copies.
+
+How your files/directories must be organized
+--------------------------------------------
+
+Each directory is expected to contain only one type of backup -- with many "copies" of that backup accumulated over time -- not a mix of backups.
+
+These backups may be either files or directories. (rm -rf will be used to remove them)
+
+Within each directory, this program will take the n most recently created files in each "time bucket" and retain them while pruning/deleting *all* 
+other files in the directory.
+
+WARNING: If you have other stuff in that directory that you want to keep, be warned: it WILL be deleted by this script!
+
+TODO: let you specify a glob pattern for files that WILL be pruned; and/or add an --ignore option to specify file patterns to ignore = NOT subject to pruning = not delete
+
+For the moment, I require that the timestamp be in the filename itself, in "%Y%m%dT%H%M%S" format.
+TODO: add option to use the timestamp recorded in the file system rather than the timestamp from within the filename.
+
+Background
+----------
+
+This is useful when you have a cron job that continuously creates backups and dumps them in a certain directory and you want to keep that directory
+from becoming inordinately large. (Or quickly get it down to a smaller size now that it's grown extremely large and you've run out of room on the disk.)
+
+The idea is that you are more likely to want/need a recent backup than an older backup. Probably because you hope to become aware of whatever problem
+necessitates looking at/using/restoring from the backup very soon after the problem arises.
+
+So you want to keep a higher density of backups from recent times than you do from older times. The high density of recent backups ensures that you 
+have a higher likelihood of having a backup from very soon before the data became corrupt/whatever and needed to be restored.
+
+For example, if you have backups for every hour in the last 24 hours, and you discover that something got deleted/corrupted/etc. at 23:15 last night,
+then if you pull the most recent backup, say the 23:00 backup, it will be at most an hour before the time of the problem. So the amount of data that
+is lost is at most 1 hour's worth.
+
+As you go further back in time, however, you are less likely to need any backups from that time. But you may want to keep them around for historical
+or statistical or "just in case there is a subtle problem that we don't find out about until 6 months later and we need to be able to go back and
+determine how it happened and restore a certain chunk of data from that old pre-problem backup."
+
+Well, this tool will help you to keep around SOME old copies, without keep around as many as you keep of the more recent ones.
+
+Options:
+  --help                 Print this message
+End
+  exit 0
+end
+
+
+require 'fileutils'
+require 'rbconfig'
+require 'tmpdir'
+require 'pathname'
+
+class Time
+  def to_s
+    #strftime("%Y%m%dT%H%M%S")
+    strftime("%Y%m%d %H%M")
+  end
+end
+
+class Bucket
+  attr_accessor :quota, :still_needed, :keepers
+  def initialize(quota)
+    self.quota = self.still_needed = quota
+    self.keepers = []
+  end
+end
+
+# PruneBackups?
+class RmExtraCopies
+  # These are actually the "quota remaining" counts for each bucket, not the buckets themselves
+  @@time_buckets = [:hourly, :daily, :weekly, :monthly, :yearly]
+  attr_accessor :dir, *@@time_buckets
+
+  def initialize
+    #@dirs = []
+    @@time_buckets.each do |time_bucket|
+      send "#{time_bucket}=", 0
+      # Bucket.new
+    end
+  end
+
+  def time_buckets_and_values
+    @@time_buckets.map do |time_bucket|
+      [time_bucket, unit(time_bucket), send("#{time_bucket}")]
+    end.reject do |name, unit, quota|
+      quota == 0
+    end
+  end
+
+  def bucket_remaining(bucket_name, decr = nil)
+    send("#{bucket_name}=", send("#{bucket_name}") - decr) if decr
+    send "#{bucket_name}"
+  end
+
+  def unit(bucket_name)
+    {
+      :hourly  => :hours,
+      :daily   => :days,
+      :weekly  => :weeks,
+      :monthly => :months,
+      :yearly  => :years,
+    }[bucket_name.to_sym]
+  end
+
+  def time_bucket_values
+    @@time_buckets.map do |time_bucket|
+      send "#{time_bucket}"
+    end
+  end
+
+  def bucket(name)
+    @buckets[name]
+  end
+
+  def now
+    Time.now
+  end
+
+  def delete_all_except(keepers)
+    @all_files.each do |file|
+      if keepers.include? file
+        puts "#{file}: in _ bucket".green
+      else
+        puts "#{file}: will delete".red
+      end
+    end
+  end
+  def delete(files)
+    puts "Deleting files: #{files.join(', ')}..."
+  end
+
+  def run
+    raise "Must keep at least 1 file from at least one time bucket" if time_bucket_values.empty?
+
+    Dir.chdir @dir do
+      puts "Entering #{@dir}..."
+      @all_files = Dir['*'].sort
+
+      files_times = @all_files.map do |filename|
+        if filename =~ /(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?/
+          y,m,d, h,i,s = $1,$2,$3, $4,$5,$6
+          time = Time.mktime(y,m,d, h,i,s)
+          [filename, time]
+        end
+      end.sort do |a, b|
+        a[1] <=> b[1]
+      end.reverse
+
+      # Fill each bucket until its quota is met
+      keepers = []
+      max_tries = @all_files.size
+      time_buckets_and_values.each do |name, unit, quota|
+        puts "Trying to fill quota of #{quota} for #{name} bucket..."
+        time_max = now
+        time_min = now.ago(1, unit)
+        tries = 0
+
+        while tries < max_tries
+          puts "Checking #{time_min} .. #{time_max}"
+          new_keepers = files_times.detect {|file, file_time|
+            time_min < file_time &&
+                       file_time <= time_max
+          }
+          if [new_keepers].any?
+            puts "Keeping #{keepers}"
+            keepers.concat [new_keepers]
+            bucket_remaining(name, [new_keepers].size)
+          end
+
+          time_max = time_min
+          time_min = time_min.ago(1, unit)
+          tries += 1
+          quota = bucket_remaining(name)
+          (puts 'Filled quota!'; break) if quota == 0
+        end
+      end
+
+      raise "Didn't find any files to keep?!" unless keepers.any?
+      delete_all_except(keepers.map {|path| path[0]})
+    end
+
+  end
+end
+
+command = RmExtraCopies.new
+
+help if ARGV.empty?
+
+opts.each do | opt, arg |
+  case opt
+
+  when '--help'
+    help
+
+  when '--hourly'
+    command.hourly = arg.to_i
+
+  when '--daily'
+    command.daily = arg.to_i
+
+  when '--weekly'
+    command.weekly = arg.to_i
+
+  when '--monthly'
+    command.monthly = arg.to_i
+
+  when '--yearly'
+    command.yearly = arg.to_i
+
+  end
+end
+
+dirs = ARGV
+raise "Must specify at least one directory" if dirs.empty?
+dirs.each do |dir|
+  command.dir = dir
+  command.run
+end
