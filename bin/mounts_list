@@ -1,0 +1,132 @@
+#!/usr/bin/ruby
+
+#-------------------------------------------------------------------------------
+def usage
+  puts <<End
+Options:
+  -d, --device-info: show model name of drive
+End
+  exit 1
+end
+
+#-------------------------------------------------------------------------------
+require 'rubygems' 
+require 'facets'
+require 'colored'
+require 'pathname'
+require 'facets/blank'
+require 'facets/symbol/to_proc'
+require 'quality_extensions/string/with_knowledge_of_color'
+
+#-------------------------------------------------------------------------------
+# duplication with files_of_hanoi
+
+columns = [:device_path, :mount_path, :file_system_type, :mount_options, :dump, :pass, :device_info]
+Disk = Struct.new(*columns)
+
+class MtabParser
+  def initialize(mtab_path)
+    @mtab_path = mtab_path
+  end
+
+  def start
+    File.open(@mtab_path, 'r') do |file|
+      file.map do |line|
+        if match = line.match(%r<^(/dev/\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+$>)
+          #puts '-----------------------------------------'
+
+          # Get the fstab data for this disk
+          d = Disk.new
+          device_path_or_uuid, d.mount_path, d.file_system_type, d.mount_options, d.dump, d.pass = match.captures
+          if device_path_or_uuid =~ %r<^(/dev/\S+)>
+            d.device_path = $1
+            #puts d.device_path
+          else
+            raise "Expected device_path_or_uuid"
+          end
+        end
+        d
+      end
+    end.compact
+  end
+end
+
+DeviceInfo = Struct.new(:model, :firmware_revision, :serial_num)
+class HdparmParser
+  def initialize(output)
+    @output = output
+  end
+
+  def start
+    d = DeviceInfo.new
+    @output.each do |line|
+      # Model=WDC WD800JB-00CRA1                      , FwRev=17.07W17, SerialNo=WD-WMA8E2651827
+      if match = line.match(%r{^\s+Model=([^,]+)\s*, FwRev=([^,]+)\s*, SerialNo=(.*)$})
+        # Get the fstab data for this disk
+        d.model, d.firmware_revision, d.serial_num = match.captures.map(&:strip)
+      end
+    end
+    raise "Could not get model from hdparm. Output=#{@output}" if d.model.nil?
+    d
+  end
+end
+
+
+#---------------------------------------------------------------------------------------------------
+
+require 'getoptlong'
+opts = GetoptLong.new(
+    [ '--help', '-h',                     GetoptLong::NO_ARGUMENT ],
+    [ '--device-info', '-d',              GetoptLong::NO_ARGUMENT ]
+)
+opts.each do | opt, arg |
+  case opt
+  when '--device-info', '-d'
+    @show_device_info = true
+  when '--help', '-h'
+    usage
+  end
+end
+
+#---------------------------------------------------------------------------------------------------
+
+
+#lines = `mount`.lines
+#mounts = lines.inject([]) do |mounts, line|
+#  #/dev/sda1 on /media/500B1 type fuseblk (rw,nosuid,nodev,allow_other,default_permissions,blksize=4096)
+#  #/dev/sda2 on /media/500B2 type ext3 
+#  if line.chomp =~ /(\S+) on (\S+) type (.*)$/
+#
+#    name        = $1
+#    mount_point = $2
+#    type        = $3
+#    @longest_name = [name.length, @longest_name.to_i].max
+#
+#    branches << Mount.new(name, mount_point, type)
+#    branches
+#  else
+#    puts "Line in unexpected format: #{line}"
+#  end
+#end
+
+disks = MtabParser.new('/etc/mtab').start
+
+disks.each do |disk|
+  device_info = HdparmParser.new(`sudo hdparm -i #{disk.device_path}`).start
+  disk.device_info = device_info.model + ' ' + device_info.serial_num
+end if @show_device_info
+
+widths = columns.inject({}) do |hash, column|
+  hash[column] = disks.map(&column).map(&:to_s).map(&:length).max
+  hash
+end
+  
+disks.each do |disk|
+  puts disk.device_path.          ljust(widths[:device_path]).cyan           + ' ' +
+      ("(#{disk.device_info})".   ljust(widths[:device_info]+2).cyan         + ' ' if @show_device_info).to_s +
+       disk.mount_path.           ljust(widths[:mount_path]).green           + ' ' +
+       disk.file_system_type.     ljust(widths[:file_system_type]).magenta   + ' ' +
+        "(#{disk.mount_options})".ljust(widths[:mount_options]+2).magenta    + ' ' +
+       ''
+end
+
