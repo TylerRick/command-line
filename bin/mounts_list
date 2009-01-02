@@ -4,7 +4,8 @@
 def usage
   puts <<End
 Options:
-  -d, --device-info: show model name of drive
+  -d, --device -- groups by device, and shows model name/serial number of each drive
+  --no-color   -- disable color [not implemented]
 End
   exit 1
 end
@@ -76,12 +77,12 @@ end
 
 require 'getoptlong'
 opts = GetoptLong.new(
-    [ '--help', '-h',                     GetoptLong::NO_ARGUMENT ],
-    [ '--device-info', '-d',              GetoptLong::NO_ARGUMENT ]
+    [ '--help', '-h',                GetoptLong::NO_ARGUMENT ],
+    [ '--device', '-d',              GetoptLong::NO_ARGUMENT ]
 )
 opts.each do | opt, arg |
   case opt
-  when '--device-info', '-d'
+  when '--device', '-d'
     @show_device_info = true
   when '--help', '-h'
     usage
@@ -113,20 +114,36 @@ disks = MtabParser.new('/etc/mtab').start
 
 disks.each do |disk|
   device_info = HdparmParser.new(`sudo hdparm -i #{disk.device_path}`).start
-  disk.device_info = device_info.model + ' ' + device_info.serial_num
+  disk.device_info = device_info.model + 
+                    ((', Serial: ' + device_info.serial_num) unless device_info.serial_num.blank?).to_s
 end if @show_device_info
 
 widths = columns.inject({}) do |hash, column|
   hash[column] = disks.map(&column).map(&:to_s).map(&:length).max
   hash
 end
-  
-disks.each do |disk|
-  puts disk.device_path.          ljust(widths[:device_path]).cyan           + ' ' +
-      ("(#{disk.device_info})".   ljust(widths[:device_info]+2).cyan         + ' ' if @show_device_info).to_s +
-       disk.mount_path.           ljust(widths[:mount_path]).green           + ' ' +
-       disk.file_system_type.     ljust(widths[:file_system_type]).magenta   + ' ' +
-        "(#{disk.mount_options})".ljust(widths[:mount_options]+2).magenta    + ' ' +
-       ''
-end
 
+class Disk
+  def to_pretty_line(widths = Hash.new(0))
+    device_path.          ljust(widths[:device_path]).cyan           + ' ' +
+    mount_path.           ljust(widths[:mount_path]).green           + ' ' +
+    file_system_type.     ljust(widths[:file_system_type]).magenta   + ' ' +
+     "(#{mount_options})".ljust(widths[:mount_options]+2).magenta    + ' ' +
+    ''
+  end
+end
+  
+if @show_device_info
+  disks.group_by(&:device_info).each do |device_info, disks|
+    device_path = disks.first.device_path.gsub(/\d/, '')  # sda1 => sda
+    puts device_path.cyan + ' ' + "(#{device_info})".blue
+    disks.each do |disk|
+      puts '  ' + disk.to_pretty_line(widths)
+    end
+    puts
+  end
+else
+  disks.each do |disk|
+    puts disk.to_pretty_line(widths)
+  end
+end
