@@ -5,7 +5,7 @@ def usage
   puts <<End
 Options:
   -d, --device -- groups by device, and shows model name/serial number of each drive
-  --no-color   -- disable color [not implemented]
+  --no-color   -- disable color
 End
   exit 1
 end
@@ -78,7 +78,8 @@ end
 require 'getoptlong'
 opts = GetoptLong.new(
     [ '--help', '-h',                GetoptLong::NO_ARGUMENT ],
-    [ '--device', '-d',              GetoptLong::NO_ARGUMENT ]
+    [ '--device', '-d',              GetoptLong::NO_ARGUMENT ],
+    [ '--no-color', '--nc',          GetoptLong::NO_ARGUMENT ]
 )
 opts.each do | opt, arg |
   case opt
@@ -86,6 +87,12 @@ opts.each do | opt, arg |
     @show_device_info = true
   when '--help', '-h'
     usage
+  when '--no-color', '-nc'
+    class String
+      def colorize(string, options = {})
+        string
+      end
+    end
   end
 end
 
