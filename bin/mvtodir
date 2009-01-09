@@ -1,0 +1,46 @@
+#!/usr/bin/ruby
+require 'rubygems'
+require 'quality_extensions/pathname'
+require 'facets'
+
+# TODO: getopt
+@verbose = true
+
+if ARGV.size < 2
+  puts <<End
+Usage: mvtodir <files...> <dir>
+
+<dir> need not already exist; it will be created it if does not.
+
+This is better than simply doing mkdir <dir>; mv <files...> <dir>, because that will try to move <dir> to itself.
+mvtodir will detect if you accidentally give the dest dir as one of the sources and will skip that, moving all other files, which is probably what you wanted...
+(Besides, mvtodir is less to type).
+End
+  exit 1
+end
+
+
+sources, dest = ARGV[0 .. -2], ARGV[-1]
+sources, dest = sources.map(&Pathname), Pathname.new(dest)
+
+sources.reject! {|source| 
+  if source == dest
+    puts "Warning: Destination dir '#{source}' given as a source file to move. Skipping..."
+    true
+  end
+}
+
+(STDERR.puts "Error: No source files to move. Aborting..."; exit 1) if sources.empty?
+
+if !dest.exist?
+  puts "#{dest} doesn't exist yet. Creating..."
+  dest.mkpath
+end
+sources.each do |source|
+  #puts "Moving #{source} to #{dest}..."
+  source.mv dest, :verbose => @verbose
+end
+
+#system %(mkdir -p #{ARGV[-1]})
+#system %(mv #{ARGV[-1]})
+
