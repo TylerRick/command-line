@@ -1,0 +1,44 @@
+#!/usr/bin/ruby
+
+# gem which gives the full path to an individual Ruby file from (probably) a gem. That's useful if you are only interested in that one file.
+# But sometimes you want to go to the root of that gem's directory, f.e. to search for a keyword within the entire gem using grep. gem which is less useful for that. Especially if the name of the gem differs from the main file you require to use that gem (rspec => 'spec' comes to mind). Sometimes you want to think in terms of the gem's name and not a file from that gem...
+# Thus gem_dir_of was born...
+#
+# Examples:
+#   cgrep keyword `gem_dir_of facets`
+#   pushd `gem_dir_of rspec`
+#   function cdgem {
+#     path=`gem_dir_of $1`
+#     if [ ! -z "$path" ]; then
+#       pushd $path
+#     fi
+#   }
+#
+# See also:
+#   /usr/local/lib/site_ruby/1.8/rubygems.rb (Gem.activate)
+#   /usr/local/lib/site_ruby/1.8/rubygems/specification.rb
+#   /usr/local/lib/site_ruby/1.8/rubygems/source_index.rb
+#   /usr/local/lib/site_ruby/1.8/rubygems/commands/which_command.rb
+
+require 'pathname'
+require 'rubygems'
+
+def find_dir(name)
+#  found = Gem.path.map {|p| Pathname.new(p) + Pathname.new('gems')}.each do |path|
+#    found = path.children.each {|gem_dir|
+#      #puts "#{gem_dir.basename} =~ #{/^#{name}-\d/}"
+#      return gem_dir if gem_dir.basename.to_s =~ /^#{name}-\d/
+#    }
+#  end
+
+  Gem.source_index.find_name(name).last
+end
+
+found = find_dir(ARGV[0])
+if found
+  puts found.full_gem_path
+  exit 0
+else
+  exit 1
+end
+
