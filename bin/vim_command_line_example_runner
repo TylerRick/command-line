@@ -1,0 +1,46 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'quality_extensions/string/prefix_lines'
+
+# Usage:
+# Go to a line containing a command line example, for example this line:
+#
+#   > echo -e "1\n2\n3\n4\n3\n4\n5" | grepto 4 | grepbackto 2
+#
+# and type .!vim_command_line_example_runner
+#
+# Better yet, create a im command to execute it for you, and put that in your .vimrc:
+#   command! -range -nargs=0 RunCommandLineExample <line1>,<line2>!vim_command_line_example_runner
+#
+# The line you are on will be replaced with itself followed by the output from running that command. For example:
+#
+#   > echo -e "1\n2\n3\n4\n3\n4\n5" | grepto 4 | grepbackto 2
+#   2
+#   3
+#   4
+#
+# If your buffer already contains the output from doing this previously, you can replace the previous output from the
+# output of running it again by simplying selecting in visual mode all the output lines in addition to the line 
+# containing the command to run (the command line), and typing :RunCommandLineExample (which will turn into 
+# :'<,'>RunCommandLineExample since you were in visual mode.) The first line will be taken to be the command to run
+# and all subsequent lines will be replaced with the new output.
+#
+# The command is assumed to begin with > or $.
+#
+# If the example is within a comment (a line preceeded by a # is all we check for currently), then this script will extract just the executable part from the line
+# and run it, and output the output from the command as comments (indented the same amount, etc.)...
+
+command_line, *previous_output = STDIN.read.lines.to_a
+
+command = command_line.chomp.gsub(/(^\s*#?\s*)[>$]/, '')
+#puts "command=#{command}"
+prefix = $1 || ''
+#puts "prefix='#{prefix}'"
+
+output = `#{command}`
+output = output.prefix_lines(prefix)
+
+puts command_line
+puts output
+
