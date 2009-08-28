@@ -31,10 +31,7 @@ elsif $?.exitstatus == 1
     exit 1
   else
     Pathname.new(dirname).mkpath
-    system "mv '#{filename}' '#{dirname}'/"
-    Dir.chdir dirname
-    system "unzip #{filename}"
-    # if $?.success?
+    system "unzip '#{filename}' -d '#{dirname}'"
     puts "Extracted contents of #{filename} within new directory #{dirname}"
   end
 end
