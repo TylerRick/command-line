@@ -1,0 +1,36 @@
+#!/usr/bin/ruby
+
+#-------------------------------------------------------------------------------
+def usage
+  puts <<End
+Usage: #{File.basename($0)} file.zip
+
+Exits with 0 if the contents of the zip file are all contained within a single directory.
+Exits with 1 if the contents of the zip file, when extracted, would clutter your working directory with a bunch (>1) of files/directories because whoever created the zip was an idiot and didn't follow the considerate practice of making zip files that, when extracted, leave you with a directory named the same as the zip (except without the .zip extension).
+End
+  exit 1
+end
+usage if ARGV.size == 0
+
+#-------------------------------------------------------------------------------
+require 'pathname'
+require 'quality_extensions/enumerable/all_same'
+
+class Pathname
+  def parts
+    a, b = split
+    if a.to_s == '/' || a.to_s == '.'
+      [b.to_s]
+    else
+      a.parts + [b.to_s]
+    end
+  end
+end
+
+contents = `zip_file_list #{ARGV[0]}`
+exit $?.exitstatus if !$?.success?
+
+exit contents.lines.map {|path|
+  #puts Pathname.new(path).parts[0]
+  Pathname.new(path).parts[0]
+}.all_same? ? 0 : 1

@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+#-------------------------------------------------------------------------------
+def usage
+  puts <<End
+Usage: #{File.basename($0)} file.zip
+
+Lists the contents of the file as a list of filenames only (unzip -l lists extra information that is harder to automatically process).
+
+Example:
+> zip -r t.zip t
+adding: t/ (stored 0%)
+adding: t/bootpart.txt (deflated 63%)
+adding: t/32bits/ (stored 0%)
+adding: t/bootpart.exe (deflated 52%)
+adding: t/file_id.diz (deflated 31%)
+adding: t/bootpart.url (deflated 33%)
+
+> zip_file_list t.zip 
+t/
+t/bootpart.txt
+t/32bits/
+t/bootpart.exe
+t/file_id.diz
+t/bootpart.url
+End
+  exit 1
+end
+usage if ARGV.size == 0
+
+#-------------------------------------------------------------------------------
+require 'facets'
+
+contents = `unzip -l #{ARGV[0]}`.lines.to_a
+header_row, contents = contents[1], contents[3..-3]
+
+md = header_row.match(/.*(Name)/)
+name_col_offset = md.begin(1)
+filenames = contents.map {|filename| filename[name_col_offset..-1]}
+
+puts filenames

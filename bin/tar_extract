@@ -1,0 +1,42 @@
+#!/usr/bin/ruby
+
+#-------------------------------------------------------------------------------
+def usage
+  puts <<End
+Usage: #{File.basename($0)} file.tar
+
+Extracts tar file normally (tar -xf file.tar) if the contents of the tar file are all contained within a single directory.
+
+Otherwise* creates a new directory with the same name as the tar file and extracts the contents into that new directory.
+
+* That is, if the contents of the tar file, when extracted, would clutter your working directory with a bunch (>1) of files/directories because whoever created the tar was uninformed and didn't follow the considerate practice of making tar files that, when extracted, leave you with a directory named the same as the tar (except without the .tar extension).
+End
+  exit 1
+end
+usage if ARGV.size == 0
+
+#-------------------------------------------------------------------------------
+require 'pathname'
+
+filename = ARGV[0]
+system "tar_contains_single_dir #{filename}"
+if $?.success?
+  system "tar -xf #{filename}"
+  puts "Extracted contents of #{filename}"
+elsif $?.exitstatus == 1
+  dirname = filename.gsub(/.tar$/, '')
+  if dirname == filename
+    STDERR.puts "Filename (#{filename}) must end with .tar"
+    exit 1
+  else
+    Pathname.new(dirname).mkpath
+    system "mv '#{filename}' '#{dirname}'/"
+    Dir.chdir dirname
+    system "tar -xf #{filename}"
+    # if $?.success?
+    puts "Extracted contents of #{filename} within new directory #{dirname}"
+    # move the file back now that it's extracted
+    # TODO: is this failsafe?
+    system "mv '#{filename}' ../"
+  end
+end
