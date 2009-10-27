@@ -1,0 +1,93 @@
+#!/usr/bin/ruby
+
+#---------------------------------------------------------------------------------------------------
+# To do:
+# * if given as a relative path from wd, change <target> into a valid relative path relative to the symlink's directory
+#   * only if they specify --absolute should we assume they want a relative path converted into an absolute
+# * how does this compare to 'man link'?
+#   * link doesn't have -f
+#   * does link change to absolute path?
+
+#---------------------------------------------------------------------------------------------------
+# Parse args
+
+require 'optparse'
+@ln_options = []
+@options = {}
+
+def parse_args
+  ARGV.options do |opts|
+    opts.banner =<<End
+Usage: #{File.basename($0)} dir_in_which_to_create_symlinks [glob]
+
+Creates symlinks in dir_in_which_to_create_symlinks for every file in current directory (or subdirectories), mirroring the directory structure exactly.
+
+More or less equivalent to doing this in bash:
+  for file in **/* ; do symlink -f $file $dir ; done
+
+If you want to use a different glob pattern other than '**/*', you can specify it after the directory.
+
+Examples:
+  ~/dev/vim/vim-rails (master) > symlink_all_in_dir ~/.vim
+  Do you really want to create symlinks in /home/tyler/.vim for these files:
+  plugin
+  plugin/rails.vim
+  Rakefile
+  doc
+  doc/rails.txt
+  README
+  autoload
+  autoload/rails.vim
+  ? (y/n) n
+
+  > symlink_all_in_dir ~/.vim '*/**' -m -f
+  Do you really want to create symlinks in /home/tyler/.vim for these files:
+  plugin/rails.vim
+  doc/rails.txt
+  autoload/rails.vim
+  ? (y/n) y
+  Creating symlink '/home/tyler/.vim/plugin/rails.vim' to target '/home/tyler/dev/vim/vim-rails/plugin/rails.vim' ...
+  Creating symlink '/home/tyler/.vim/doc/rails.txt' to target '/home/tyler/dev/vim/vim-rails/doc/rails.txt' ...
+  Creating symlink '/home/tyler/.vim/autoload/rails.vim' to target '/home/tyler/dev/vim/vim-rails/autoload/rails.vim' ...
+
+End
+ 
+    opts.on("-f" , "--force"       , "Passes --force to ln") { @ln_options << '--force' }
+    opts.on("-i" , "--interactive" , "Passes --interactive to ln") { @ln_options << '--interactive' }
+    opts.on("-m" , "--mkdir"       , "Attempts to create the dir (using mkdir -p) where the symlink will be created, for each symlink.") { @options[:mkdir] = true }
+    opts.on("-n" , "--no-act"      , "[Not implemented]") { @options[:no_act] = true }
+    opts.separator ""
+    opts.on("-h" , "--help"        , "Show this help message.") { puts opts; exit }
+    opts.parse!
+  end
+end
+parse_args
+
+unless ARGV.size >= 1
+  ARGV.unshift '--help'
+  parse_args
+end
+
+dir = ARGV[0]
+glob = ARGV[1] || '**/*'
+
+#---------------------------------------------------------------------------------------------------
+# Main
+
+require 'pathname'
+require 'facets/class/to_proc'
+
+paths = Dir[glob].map(&Pathname)
+#Pathname.new('.').find do |path|
+#  paths << path
+#end
+puts "Do you really want to create symlinks in #{dir} for these files:"
+puts paths
+print "? (y/n) "
+exit unless STDIN.gets[0..0].downcase == 'y'
+
+paths.each do |path|
+  #FileUtils.mkdir_p File.dirname("#{dir}/#{path}") if @options[:mkdir]
+  (Pathname.new(dir) + Pathname.new(path)).dirname.mkpath if @options[:mkdir]
+  system "symlink #{@ln_options.join(' ')} '#{path}' '#{dir}/#{path}'"
+end
