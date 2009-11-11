@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 ps aux | grep -v '/psgrep\| grep --color -i' | grep --color -i "$@"
 

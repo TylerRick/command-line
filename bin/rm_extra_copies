@@ -1,11 +1,22 @@
 #!/usr/bin/ruby
+# vim: textwidth=150
+
+=begin To Do
+Alias/rename: trim_dir
+
+Add --duplicates/--dups option, that when present deletes all duplicate files in a directory
+
+Add --max-size option: keeps deleting until the du -s #{dir} reports that it is beneath that threshold.
+What order should it delete? Oldest first?
+After each deletion, checks if it's reached (below) max size yet (just check filesize before deleting and then subtract that from a running total -- faster than doing a du over and over).
+Before any other deletes, it should search for/delete duplicates. If --duplicates option present, will do the search even if already below max size.
+=end
 
 require 'getoptlong'
 require 'rubygems'
 require 'facets'
 require_local 'rm_extra_copies'
 
-# vim: textwidth=150
 def help
   puts <<End
 Synopsis:

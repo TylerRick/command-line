@@ -31,7 +31,13 @@ elif [ $# == 1 ]; then
 	path=./
 	expression=$1
 else
-	echo "Usage: ffind [path...] [expression]"
+	cat - <<End
+Usage: ffind [path...] [expression]"
+
+Examples:
+To find *all* files (after pruning uninteresting ones):
+  ffind '' .
+End
 	exit 1
 fi
 
@@ -40,4 +46,5 @@ fi
 # Pass them on to find
 
 #find $path \( \! -name "*.swp" \) -and \( \! -name "*.pyc" \) -and \( \! -name "*.svn*" \) -and \( -name "*$expression*" \) -exec echo {} \;
-find $path \( -type d -name .svn -prune \) -o \( -type f -name "*.swp" -prune \) -o \( -type f -name "*.rake" -prune \) -o \( -name "*$expression*" \) -exec echo {} \; | grep --color=auto $expression
+find $path \( -type d -name .git -prune \) -o \( -type d -name .svn -prune \) -o \( -type f -name "*.swp" -prune \) -o \( -name "*$expression*" \) -exec echo {} \; | grep --color=auto $expression
+#-o \( -type f -name "*.rake" -prune \) 

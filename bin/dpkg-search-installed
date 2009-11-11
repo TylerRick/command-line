@@ -1,2 +1,2 @@
-echo "dpkg --get-selections | grep -i \"$@\""
-dpkg --get-selections | grep -i "$@"
+echo "dpkg --get-selections | egrep -i \"$@\""
+dpkg --get-selections | egrep -i "$@"

@@ -1,33 +1,34 @@
 #!/bin/bash
 
-# to do: move to ~/installed/tyler-shell
-#packageDir="~/public/shell"      # this said couldn't stat when used with diff $packageDir/.irbrc, so I guess let's expand it
-packageDir=`echo ~/public/shell`
-#echo $packageDir
+# svn checkout this to, for example, ~/installed/tyler-shell and then run script/install
+
+cd `dirname $0`/..
+package_dir=`bin/realpath .`
+#echo $package_dir
 
 touch ~/.bashrc
 grep "bash/bashrc" ~/.bashrc > /dev/null
 if [[ "$?" == "1" ]]; then
 	echo "Installing bash/bashrc"
-	echo "source $packageDir/bash/bashrc" >> ~/.bashrc
+	echo "source $package_dir/bash/bashrc" >> ~/.bashrc
 fi
 
 touch ~/.bash_profile
 grep "bash/bash_profile" ~/.bash_profile > /dev/null
 if [[ "$?" == "1" ]]; then
 	echo "Installing bash/bash_profile"
-	echo "source $packageDir/bash/bash_profile" >> ~/.bash_profile
+	echo "source $package_dir/bash/bash_profile" >> ~/.bash_profile
 fi
 
 touch ~/.bash_logout
 grep "bash/bash_logout" ~/.bash_logout > /dev/null
 if [[ "$?" == "1" ]]; then
 	echo "Installing bash/bash_logout"
-	echo "source $packageDir/bash/bash_logout" >> ~/.bash_logout
+	echo "source $package_dir/bash/bash_logout" >> ~/.bash_logout
 fi
 
-[   -e ~/.irbrc ]   && echo "~/.irbrc already exists'" && diff ~/.irbrc $packageDir/.irbrc
-[ ! -e ~/.irbrc ] && cp $packageDir/.irbrc ~/.irbrc 
+[   -e ~/.irbrc ]   && echo "~/.irbrc already exists'" && diff ~/.irbrc $package_dir/.irbrc
+[ ! -e ~/.irbrc ] && cp $package_dir/.irbrc ~/.irbrc 
 
 mkdir -p ~/.paths.d
 

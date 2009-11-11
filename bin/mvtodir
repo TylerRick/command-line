@@ -52,7 +52,7 @@ sources, dest = ARGV[0 .. -2], ARGV[-1]
 sources, dest = sources.map(&Pathname), Pathname.new(dest)
 
 sources.reject! {|source| 
-  if source == dest
+  if source.absolutize == dest.absolutize
     puts "Warning: Destination dir '#{source}' given as a source file to move. Skipping..."
     true
   end

@@ -1,1 +1,2 @@
-netstat -lpn 2>/dev/null | grep :$1 | awk '{print $7}' | sed 's#[^0-9]*##g'
+#netstat -lpn 2>/dev/null | grep $1 | awk '{print $7}' | sed 's#[^0-9]*##g'
+sudo netstat -lpn 2>/dev/null | grep :$1 | awk '{print $7}' | sed 's#[^0-9]*##g'

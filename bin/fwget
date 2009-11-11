@@ -1,3 +1,4 @@
 #!/bin/bash
-source `dirname $0`/set_firefox_user_agent
+#source `dirname $0`/set_firefox_user_agent
+/home/tyler/public/shell/bin/set_firefox_user_agent
 wget --user-agent "$user_agent" "$@"

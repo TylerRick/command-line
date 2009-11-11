@@ -3,9 +3,19 @@
 require 'rubygems'
 require 'facets/random'
 
+if ARGV[0] == '-v'
+  ARGV.shift
+  verbosity = 1
+elsif ARGV[0] == '-vv'
+  ARGV.shift
+  verbosity = 2
+else
+verbosity = 0
+end
+
+
 n     = (ARGV[0] || 60).to_i
 units = ARGV[1] || 'minutes'
-verbosity = 0
 
 # Convert to seconds
 case units
@@ -18,6 +28,8 @@ end
 r = Random.number(n).to_i
 
 case units
+when 'seconds'
+  r_in_units = r
 when 'minutes'
   r_in_units = r / 60
 when 'hours'
@@ -25,6 +37,9 @@ when 'hours'
 end
 
 puts "Sleeping for #{r_in_units} #{units} (#{r} s)" if verbosity >= 1
-sleep r
-#sleep_loudly r if verbosity >= 2
+if verbosity >= 2
+  sleep_loudly r
+else
+  sleep r
+end
 puts 'Done sleeping.' if verbosity >= 1

@@ -61,6 +61,7 @@ cycle_kill () {
   return $RETVAL
 }
 
+echo for pid in "$@"
 for pid in "$@"; do
   cycle_kill $pid
 done

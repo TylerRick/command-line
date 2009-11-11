@@ -2,23 +2,29 @@
 require 'rubygems'
 require 'escape'
 require 'pathname'
+require 'quality_extensions/pathname'
 
 # Useful for creating symlinks in other directories...
 #~/dev/gnome/nautilus/columns > ln -s mp3_info_columns.py ~/.nautilus/python-extensions/
 #~/dev/gnome/nautilus/columns > ln -s `full_path mp3_info_columns.py` ~/.nautilus/python-extensions/
 
+# Note: Be aware that it will dereference all symlinks in path to give you the canonical name. Sometimes this might not be what you want.
+# To do: how can we get the full path without doing that (without doing readlink)?
 
-
-# TODO: only prepend getwd if not already absolute path. Pathname#absolute?
-full_path =
-    File.join(
-        Dir.getwd,
-        ARGV[0]
-    )
-
-# change /path/to/./dir/file into simply
-#        /path/to/dir/file
-full_path = Pathname.new(full_path).cleanpath
+#def full_path(path)
+#  # TODO: only prepend getwd if not already absolute path. Pathname#absolute?
+#  full_path =
+#      File.join(
+#          Dir.getwd,
+#          path
+#      )
+#
+#  # change /path/to/./dir/file into simply
+#  #        /path/to/dir/file
+#  full_path = Pathname.new(full_path).cleanpath
+#end
 
 #puts Escape.shell_command(full_path)  # the only problem with this is that it defaults to using quotes, so that there are still spaces -- causes problems when you try to do firefox_in_default_profile `full_path some_page.html` because the results of the `` appear as multiple args (one arg for the part before the space, and one arg for the part after)
-puts full_path
+if $0 == __FILE__
+  puts Pathname.new(ARGV[0] || '.').absolutize
+end

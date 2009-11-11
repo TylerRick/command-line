@@ -4,6 +4,6 @@
 # Q: Why doesn't this work when I do rsyncbig 'host:name with spaces' 'name with spaces' ?
 # A: Use --protect-args
 
-echo rsync --protect-args --archive --partial --progress "$@"
-     rsync --protect-args --archive --partial --progress "$@"
+echo rsync -i --protect-args --archive --partial --progress "$@"
+     rsync -i --protect-args --archive --partial --progress "$@"
 

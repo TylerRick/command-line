@@ -123,10 +123,10 @@ fi
 #---------------------------------------
 if [[ $get_file_list_from = "cgrep" ]]; then
 	echo "Searching for files containing \"$grep_search_expression\"..."
-	files_to_change=`cgrep "$grep_search_expression" . l${case_insensitive_flag}`
+	files_to_change=`cgrep "$grep_search_expression" . -l${case_insensitive_flag}`
 elif [[ $get_file_list_from = "cfgrep" ]]; then
 	echo "Searching for files containing \"$grep_search_expression\"..."
-	files_to_change=`cfgrep "$grep_search_expression" . l${case_insensitive_flag}`
+	files_to_change=`cfgrep "$grep_search_expression" . -l${case_insensitive_flag}`
 fi
 
 #---------------------------------------
@@ -141,7 +141,7 @@ echo $files_to_change | VimSub.py "$vim_search_expression" "$replace_expression"
 # If VimSub.py was successful, then start the vim script.
 if [ -f ~/tmp/vimsub.vim ]; then
 	# Give one last chance to bail out
-	echo "Execute: \`vim -S ~/tmp/vimsub.vim\`"
+	echo "Executing: \`vim -S ~/tmp/vimsub.vim\`"
 	echo "-----------------------------------------------------------"
 	cat ~/tmp/vimsub.vim
 	echo "-----------------------------------------------------------"

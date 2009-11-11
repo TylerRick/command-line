@@ -4,6 +4,7 @@ def usage
   puts <<End
 Usage: rmswap file.txt    # removes .file.txt.swp if it exists
        rmswap -r          # recursively removes all .swp files in the current directory
+                          # (basically equivalent to: find . -name ".*.sw?" -print -exec rm {} \; but with the added benefit that it gives you a preview and asks you to confirm)
 End
 end
 
@@ -30,7 +31,7 @@ elsif ARGV[0] == '-r'
   end
 else
   dir, file = File.dirname(ARGV[0]), File.basename(ARGV[0])
-  file = ".#{file}.sw*"
+  file = ".#{file}.sw?"
   glob = "#{dir}/#{file}"
   Dir[glob].each do |file|
     rm file

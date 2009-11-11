@@ -2,8 +2,10 @@
 require 'fileutils'
 enabled_path = ARGV[0]  # vendor/plugins/bad_plugin
 if enabled_path =~ %r[vendor/plugins]
-  FileUtils.mkdir_p 'vendor_plugins'
+  #FileUtils.mkdir_p 'vendor_plugins'
   disabled_path = enabled_path.gsub('vendor/plugins', 'vendor_plugins')
+  puts File.dirname(disabled_path)
+  FileUtils.mkdir_p File.dirname(disabled_path)
 else
   disabled_path = enabled_path.gsub('/', '_')
 end

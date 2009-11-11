@@ -1,62 +1,45 @@
 #!/bin/bash
 
-mkdir -p ~/temp
+# Ideas for next version:
+# Use Ruby to recurse directory trees, like sync_paths
+# Emit a blank line in L for file if only exists in R, so that it lines up in vimdiff
 
-leftDir=$1
-rightDir=$2
+mkdir -p ~/tmp
 
-echo -n "" > ~/temp/dir_diff-left
-echo -n "" > ~/temp/dir_diff-right
+ldir="$1"
+rdir="$2"
 
 # Step 1: For every file, get its full details using ls
-
-find $leftDir | xargs -n1 ls -ld >> ~/temp/dir_diff-left
-find $rightDir | xargs -n1 ls -ld >> ~/temp/dir_diff-right
+ 
+#pushd "$ldir"
+#find . -print0 | xargs -0 -n1 ls -ld > ~/tmp/dir_diff-left
+#popd
+#
+#pushd "$rdir"
+#find . -print0 | xargs -0 -n1 ls -ld > ~/tmp/dir_diff-right
+#popd
 
 # Step 2: Extract only the details we want from the ls output
-# -rw-r--r--  1 tyler tyler 658 Jul  6 10:58 filename
-#     1       2   3    4     5   6   7   8     9
-#                      \/
-# 658 filename
-#  1    2
 
-gawk '{printf("%s \t %s \n", $5, $9)}' ~/temp/dir_diff-left | grep -v "\.svn" > ~/temp/dir_diff-left2
-gawk '{printf("%s \t %s \n", $5, $9)}' ~/temp/dir_diff-right | grep -v "\.svn" > ~/temp/dir_diff-right2
+ls_parser --size --filename < ~/tmp/dir_diff-left  > ~/tmp/dir_diff-left2
+ls_parser --size --filename < ~/tmp/dir_diff-right > ~/tmp/dir_diff-right2
 
 # Step 3: Strip off that directory path prefix from each path, so that we don't throw off vimdiff
-
-sed "s#$leftDir##g" ~/temp/dir_diff-left2 > ~/temp/dir_diff-left3
-sed "s#$rightDir##g" ~/temp/dir_diff-right2 > ~/temp/dir_diff-right3
+#
+#sed "s#$ldir##g" ~/tmp/dir_diff-left2 > ~/tmp/dir_diff-left3
+#sed "s#$rdir##g" ~/tmp/dir_diff-right2 > ~/tmp/dir_diff-right3
 
 # Step 4: Sort by filename (column 2)
-
-gawk '{printf("%s \t %s \n", $2, $1)}' ~/temp/dir_diff-left3 | sort | gawk '{printf("%s \t %s \n", $2, $1)}'  > ~/temp/dir_diff-left4
-gawk '{printf("%s \t %s \n", $2, $1)}' ~/temp/dir_diff-right3 | sort | gawk '{printf("%s \t %s \n", $2, $1)}'  > ~/temp/dir_diff-right4
+#
+#gawk '{printf("%s \t %s \n", $2, $1)}' ~/tmp/dir_diff-left3 | sort | gawk '{printf("%s \t %s \n", $2, $1)}'  > ~/tmp/dir_diff-left4
+#gawk '{printf("%s \t %s \n", $2, $1)}' ~/tmp/dir_diff-right3 | sort | gawk '{printf("%s \t %s \n", $2, $1)}'  > ~/tmp/dir_diff-right4
 
 # Step 5: Prepend the directory path at the top of each file, so they can see which file the left represents and which file the right represents
 
-echo "$leftDir" > ~/temp/dir_diff-left5
-echo "$rightDir" > ~/temp/dir_diff-right5
-cat ~/temp/dir_diff-left4 >> ~/temp/dir_diff-left5
-cat ~/temp/dir_diff-right4 >> ~/temp/dir_diff-right5
+echo "$ldir" > ~/tmp/dir_diff-left5
+echo "$rdir" > ~/tmp/dir_diff-right5
+cat ~/tmp/dir_diff-left2 >> ~/tmp/dir_diff-left5
+cat ~/tmp/dir_diff-right2 >> ~/tmp/dir_diff-right5
 
-# Step 6: Generate md5 checksum for each file and append that to the end of the line
 
-echo -n "" > ~/temp/dir_diff-left6
-echo -n "" > ~/temp/dir_diff-right6
-
-cat ~/temp/dir_diff-left5 | while read line
-do
-	file=`echo $line | gawk '{printf("%s", $2)}'`
-	sum=`md5sum $leftDir/$file 2> /dev/null | gawk '{print $1}'`
-	echo -e "$line \t $sum" >> ~/temp/dir_diff-left6
-done
-
-cat ~/temp/dir_diff-right5 | while read line
-do
-	file=`echo $line | gawk '{printf("%s", $2)}'`
-	sum=`md5sum $rightDir/$file 2> /dev/null | gawk '{print $1}'`
-	echo -e "$line \t $sum" >> ~/temp/dir_diff-right6
-done
-
-vimdiff ~/temp/dir_diff-left6 ~/temp/dir_diff-right6
+vimdiff ~/tmp/dir_diff-left5 ~/tmp/dir_diff-right5

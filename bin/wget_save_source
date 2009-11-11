@@ -1,4 +1,5 @@
 #!/bin/bash
+# To do: rather than base it on $1, tee the output and extract filename from "Saved as ___" that is output
 basename=`basename $1`
 wget "$@"
 echo $1 > $basename.source

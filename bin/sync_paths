@@ -7,8 +7,11 @@ Synopsis:
   Usage: 
     To create a file list:
       #{File.basename($0)} --print-paths > <master_paths_list_file>
+
     To use a file list as input:
-      #{File.basename($0)} <master_paths_list_file>|<path_to_master_tree>
+      #{File.basename($0)} [--match-method=first-word] [-n] [-v] <path_to_master_tree> < <master_paths_list_file>
+    or:
+      $ #{File.basename($0)} -p | ssh other_host 'cd slave_dir; #{File.basename($0)}'
 
 Detailed description:
 ---------------------
@@ -194,7 +197,7 @@ class TreePathMerger
   def add_path_to_list(list, path, match_method)
     path = Pathname.new(path).cleanpath
     key = match_method.call(path)
-    (STDERR.puts "Error: Two different paths ('#{path}' and '#{list[key]}') have the same key ('#{key}'). Please rename/delete one of the duplicates or use a different match method."; exit 1) if list.has_key?(key)
+    (STDERR.puts "Warning: Two different paths ('#{path}' and '#{list[key]}') have the same key ('#{key}'). Please rename/delete one of the duplicates or use a different match method.") if list.has_key?(key)
     list[key] = path
   end
 
@@ -218,8 +221,8 @@ class TreePathMerger
     end
     @mastr_paths.reject!{ |k,v| k.to_s == '.' }
     @slave_paths.reject!{ |k,v| k.to_s == '.' }
-#    p @mastr_paths.keys
-#    p @slave_paths
+    #puts @mastr_paths.keys; exit
+    #puts @slave_paths.keys; exit
   end
 
 
@@ -244,9 +247,11 @@ class TreePathMerger
     end
 
     if any_missing && !options[:continue_if_missing]
-      print "Continue anyway? [Yn] "
-      resp = STDIN.gets.chomp
-      (puts 'Exiting'; exit) if resp[0..0]=='n'
+      if $interactive
+        print "Continue anyway? [Yn] "
+        resp = STDIN.gets.chomp
+        (puts 'Exiting'; exit) if resp[0..0]=='n'
+      end
       puts
     end
 
@@ -316,7 +321,7 @@ class TreePathMerger
       puts "Moving to overridden destination '#{overridden_dest.to_s.bold}'" if verbose?
       if overridden_dest.exist?
         STDERR.puts "'#{overridden_dest.to_s.bold}' already exists. Please select a different option.".red
-        redo
+        action = :redo
       end
     end
 
@@ -339,7 +344,7 @@ class TreePathMerger
       dest.dirname.mkpath unless no_act?
     end
 
-    unless action == :skip
+    unless action == :skip or action == :redo
       mv_options = {}
       #mv_options[:verbose] = true if verbose?
       mv_options[:noop] = true if no_act?
@@ -416,31 +421,34 @@ if $0 == __FILE__
     paths_list = TreePathMerger.build_paths_list('.')
     puts paths_list
     exit 0
-  end
 
-  if @read_from_stdin
-    if STDIN.tty?
-      usage; exit 1
-    end
-    paths_list = STDIN.read
-  else
-    if ARGV.size < 1
-      usage; exit 1
-    end
-    file = Pathname.new(ARGV[0])
-    if file.file?
-      paths_list = file.read.lines.map(&:chomp)
-    elsif file.directory?
-      paths_list = TreePathMerger.build_paths_list(file)
+  else # mode == :rename_by_paths_list
+    if !STDIN.tty?
+      paths_list = STDIN.read.lines.map(&:chomp)
+      #p paths_list
+      begin
+        STDIN.reopen(File.new("/dev/tty"))
+      rescue Exception #Errno::ENXIO
+        puts $!
+        $interactive = false
+      end
     else
-      STDERR.puts "Not a file or directory: #{file}"
-      exit 1
+      #if ARGV.size < 1
+      #  usage; exit 1
+      #end
+      file = Pathname.new(ARGV[0])
+      #if file.file?
+        #paths_list = file.read.lines.map(&:chomp)
+      if file.directory?
+        paths_list = TreePathMerger.build_paths_list(file)
+      else
+        STDERR.puts "Not a file or directory: #{file}"
+        exit 1
+      end
     end
+    merger = TreePathMerger.new(paths_list, options)
+    merger.start
   end
-
-
-  merger = TreePathMerger.new(paths_list, options)
-  merger.start
 end
 
 

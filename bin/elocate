@@ -5,6 +5,10 @@
 #   (So remember to escape literal '.'s and such ... elocate '\.iso')
 # Since I almost always only want to match against basename, it includes --basename hard-coded.
 
+# Example: you want to find all files that contain 'ruby' and having a .txt extension.
+# elocate 'ruby.*\.txt$' -i
+# If you want to use alternation (|), don't forget to escape the |.
+# elocate 'trash\|delete\|destroy\|remove' -i
 
 # elocate Pictures
 # locate --basename -rPictures$ | grep --color -i Pictures
@@ -13,6 +17,7 @@
 
 pattern=$1
 grep_pattern=$1
+shift
 
 if echo "$pattern" | grep '^\^'; then
   # If the search expression starts with ^, then we shouldn't pipe it to grep because grep will try to match against the entire path instead of the basename, and will fail.
@@ -20,4 +25,4 @@ if echo "$pattern" | grep '^\^'; then
   grep_pattern=`echo $pattern | sed 's/^\^//'`
   #locate --basename -r"$pattern"
 fi
-locate --basename -r"$pattern" | grep --color -i "$grep_pattern"
+locate --basename -r"$pattern" "$@" | grep --color -i "$grep_pattern"

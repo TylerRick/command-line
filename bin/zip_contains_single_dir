@@ -1,18 +1,43 @@
 #!/usr/bin/ruby
 
-#-------------------------------------------------------------------------------
-def usage
-  puts <<End
+#---------------------------------------------------------------------------------------------------
+# Parse args
+
+require 'optparse'
+
+@options = {
+}
+
+def parse_args
+  ARGV.options do |opts|
+    opts.banner = <<End
 Usage: #{File.basename($0)} file.zip
 
+By default, it assumes it is being used in a script and therefore communicates its result via its exit code:
 Exits with 0 if the contents of the zip file are all contained within a single directory.
 Exits with 1 if the contents of the zip file, when extracted, would clutter your working directory with a bunch (>1) of files/directories because whoever created the zip was an idiot and didn't follow the considerate practice of making zip files that, when extracted, leave you with a directory named the same as the zip (except without the .zip extension).
+
+If you'd rather see the result on stdout, just pass the -v/--verbose option.
 End
-  exit 1
+
+    opts.on("-v", "--verbose", "Be more verbose")                                                                       { @options[:verbose] = true }
+    opts.separator ""
+    opts.on("-h", "--help", "Show this help message.")                                                                  { puts opts; exit }
+    opts.parse!
+  end
 end
-usage if ARGV.size == 0
+parse_args
+
+if ARGV.size == 0
+  # TODO: is there a less hacking way to do this?
+  ARGV.unshift '--help'
+  parse_args
+end
+
+#---------------------------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
+# Main
 require 'pathname'
 require 'quality_extensions/enumerable/all_same'
 
@@ -28,9 +53,21 @@ class Pathname
 end
 
 contents = `zip_file_list #{ARGV[0]}`
-exit $?.exitstatus if !$?.success?
+exit_code = $?.exitstatus if !$?.success?
 
-exit contents.lines.map {|path|
-  #puts Pathname.new(path).parts[0]
+prefixes = contents.lines.map {|path|
   Pathname.new(path).parts[0]
-}.all_same? ? 0 : 1
+}.uniq
+
+exit_code = prefixes.all_same? ? 0 : 1
+
+if @options[:verbose]
+  case exit_code
+  when 0
+    puts "All files have the same prefix: #{prefixes.first}/"
+  when 0
+    puts "Not all files have the same prefix. Contents:\n#{contents}"
+  end
+else
+  exit exit_code
+end

@@ -1,5 +1,13 @@
+#!/usr/bin/env ruby
 # TODO: let you pipe a not-found error into inst and it will extract the "You can install it by..." line and execute it.
-echo "sudo apt-get install" "$@"
-sudo apt-get install "$@"
+#echo "sudo apt-get install" "$@"
+#sudo apt-get install "$@"
 # TODO: after installing, list files in package / files added, especially list if there are any new man pages or documentation to get you started
 
+if ARGV[0] =~ /\.deb$/
+  puts   "sudo dpkg -i #{ARGV.join(' ')}"
+  system "sudo dpkg -i #{ARGV.join(' ')}"
+else
+  puts   "sudo apt-get install #{ARGV.join(' ')}"
+  system "sudo apt-get install #{ARGV.join(' ')}"
+end

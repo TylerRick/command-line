@@ -1,20 +1,76 @@
 #!/usr/bin/ruby
 
-#~/src/media_players/gpodder (master) > #ln -s data/gpodder.glade  /home/tyler/dev/inactive/media_players/gpodder/share/gpodder/gpodder.glade
-# Produced this broken link, because the symlink was relative to itself not the working directory of where I was when I created the symlink!
-#~/src/media_players/gpodder (master) > #/home/tyler/dev/inactive/media_players/gpodder/share/gpodder/gpodder.glade -> data/gpodder.glade
+#---------------------------------------------------------------------------------------------------
+# To do:
+# * if given as a relative path from wd, change <target> into a valid relative path relative to the symlink's directory
+#   * only if they specify --absolute should we assume they want a relative path converted into an absolute
+# * how does this compare to 'man link'?
+#   * link doesn't have -f
+#   * does link change to absolute path?
+
+#---------------------------------------------------------------------------------------------------
+# Parse args
+
+require 'optparse'
+@ln_options = []
+
+def parse_args
+  ARGV.options do |opts|
+    opts.banner =<<End
+Usage: #{File.basename($0)} <target> <path/to/symlink>
+
+Similar to ln -s <target> <path/to/symlink> except that: if <target> is a relative path, it will be adjusted to be a valid absolute path
+
+(If <target> is already an absolute path, then it *should* behave pretty much identically to a normal call to ln -s .)
+
+The behavior of ln -s by itself seems broken/unintuitive: it will leave it as a relative link (unchanged) and treat it as if it were already a valid path relative to the symlink's directory, when in fact it may not be, and probably isn't if you are using the shell's tab completion to find the path to the target file relative to the current working directory...
+
+With this script, however, you don't have to worry when you use a relative path for the target, because it will be converted for you.
+
+Example:
+  ~/src/gpodder > ln -s data/gpodder.glade /home/tyler/src/gpodder/share/gpodder/gpodder.glade
+
+  # Produced this broken link, because when the system tries to dereference the symlink, it tries to follow the relative path relative to the path of the symlink itself
+  # instead of relative to the working directory where I was when I created the symlink!
+  
+  /home/tyler/src/gpodder/share/gpodder/gpodder.glade -> data/gpodder.glade
+  /home/tyler/src/gpodder/share/gpodder/data/gpodder.glade
+  # Should be:
+  /home/tyler/src/gpodder/data/gpodder.glade
+End
+ 
+    opts.on("-f", "--force"  , "Passes --force to ln") { @ln_options << '--force' }
+    opts.on("-i", "--interactive"  , "Passes --interactive to ln") { @ln_options << '--interactive' }
+    opts.on("-n", "--no-act"  , "[Not implemented]") { @options[:no_act] = true }
+    opts.separator ""
+    opts.on("-h", "--help", "Show this help message.")                                                                  { puts opts; exit }
+    opts.parse!
+  end
+end
+parse_args
+
+unless ARGV.size >= 2
+  # TODO: is there a less kludgy way to do this?
+  ARGV.unshift '--help'
+  parse_args
+end
+
+#---------------------------------------------------------------------------------------------------
+# Main
 
 require 'pathname'
+
 wd = Pathname.new(Dir.getwd)
 symlink = wd + Pathname.new(ARGV[1])
 target = wd + Pathname.new(ARGV[0])
 if symlink.directory?
-  symlink = symlink+ target.basename
+  symlink = symlink + target.basename
 end
 #puts symlink
 #puts target
 if target.relative?
   target = target.relative_path_from(symlink.parent)
 end
-puts "Creating symlink symlink #{symlink} to target #{target}..."
-system "ln -s '#{target}' '#{symlink}'"
+
+puts "Creating symlink '#{symlink}' to target '#{target}' ..."
+system "ln -s #{@ln_options.join(' ')} '#{target}' '#{symlink}'"

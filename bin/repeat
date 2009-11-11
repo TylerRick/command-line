@@ -1,12 +1,12 @@
 #!/bin/bash
 if [ $# -lt 1 ]; then
-	echo "repeat  --  Repeats a given command (ls / ps / etc.) every second"
-	echo "Usage: repeat {CommandToRepeat}"
+	echo "repeat  --  Repeats a given command (ls / ps / etc.) every n seconds"
+	echo "Usage: repeat [-d delay] command_to_repeat"
 	exit 1
 fi
 
 while [ 1 == 1 ]; do
 	$*
-	sleep 1
+	#sleep 1
 
 done

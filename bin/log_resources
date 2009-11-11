@@ -33,26 +33,32 @@ mkdir -p ${log_resources_dir}
 now=`date +%Y%m%dT%H%M`
 #export TERM=linux      # may be needed to trick top to display nicely?
 
+#echo df
 file=${log_resources_dir}/df
 header $file
 df >> $file
 
+#echo uptime
 file=${log_resources_dir}/uptime
 header $file
 uptime >> $file
 
+#echo pstree
 file=${log_resources_dir}/pstree
 header $file
 pstree >> $file
 
+#echo ps
 file=${log_resources_dir}/ps
 header $file
 ps aux >> $file
 
+#echo free
 file=${log_resources_dir}/free
 header $file
 free -m -o >> $file
 
+#echo top
 file=${log_resources_dir}/top
 header $file
 top -b -n1 | head -n 25 >> $file
