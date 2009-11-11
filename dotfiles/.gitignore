@@ -1,0 +1,10 @@
+# If you accidentally added a bunch of files you wanted to ignore, can do this to undo:
+# findbyname .svn-base | xargs -n1 git rm --cached
+# findbyname .svn | xargs -n1 git rm -r --cached
+
+.*.sw*
+*.pyc
+*.svn
+*.svn-base
+*~
+#*.vim

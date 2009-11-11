@@ -1,0 +1,42 @@
+[user]
+	name = Tyler Rick
+	email = github.com@tylerrick.com
+[branch "master"]
+[color]
+	diff = auto
+	status = auto
+	branch = auto
+[apply]
+	whitespace = nowarn
+[alias]
+    st = status
+    ci = commit
+    co = checkout
+    cp = copy
+    eu = each-unadded
+    sr = svn rebase
+    sdc = svn dcommit
+    uncommit = reset --soft HEAD^
+    pushinit = push origin master:refs/heads/master
+[branch]
+	autosetupmerge = true
+[core]
+	excludesfile = $HOME/.gitignore
+
+#[merge]
+#  tool = vimdiff
+
+# http://onestepback.org/index.cgi/Tech/Git/UsingP4MergeWithGit.red
+[merge]
+	summary = true
+	tool = "p4merge" 
+[mergetool "p4merge"]
+	#cmd = ~/bin/p4merge \
+	cmd = /home/tyler/Software/Perforce/p4v/bin/p4merge \
+		"$PWD/$BASE" \
+		"$PWD/$LOCAL" \
+		"$PWD/$REMOTE" \
+		"$PWD/$MERGED" 
+	keepBackup = false
+	trustExitCode = false
+

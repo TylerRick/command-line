@@ -27,8 +27,13 @@ if [[ "$?" == "1" ]]; then
 	echo "source $package_dir/bash/bash_logout" >> ~/.bash_logout
 fi
 
-[   -e ~/.irbrc ]   && echo "~/.irbrc already exists'" && diff ~/.irbrc $package_dir/.irbrc
-[ ! -e ~/.irbrc ] && cp $package_dir/.irbrc ~/.irbrc 
+pushd dotfiles >/dev/null
+for dotfile in .??* ; do
+	[[   -e ~/$dotfile ]]                  && echo "~/$dotfile already exists'" && diff ~/$dotfile $package_dir/dotfiles/$dotfile
+	[[ ! -e ~/$dotfile || -L ~/$dotfile ]] && ln -sf $package_dir/dotfiles/$dotfile ~/$dotfile 
+done
+popd >/dev/null
+exit
 
 mkdir -p ~/.paths.d
 
