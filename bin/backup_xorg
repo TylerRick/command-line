@@ -1,0 +1,64 @@
+#!/bin/bash
+
+if [[ $1 == '--help' ]]; then
+    cat - <<End
+backup_xorg --  Makes a backup copy of your /etc/X11/xorg.conf.? and /var/log/Xorg.?.log
+
+How to install:
+---------------
+
+Install in startup script
+
+How to use:
+-----------
+
+Look in /etc/X11 for a directory name with the date of the bootup you are interested in.
+
+If you are only interested in working xorg configurations, run this:
+    ls /etc/X11/*-good -d
+
+Why I wrote it:
+---------------
+
+I wanted to keep a log of all successful and unsuccessful xorg.conf configurations.
+This presented several problems:
+1. How do I know which .conf and .log files were actually used last? 
+    /etc/X11/xorg.conf isn't always used. 
+    The xorg.conf* that was most recently modified isn't always the one that was used. Sometimes, for example, /etc/X11/xorg.conf.failsafe is used.
+2. The .conf and the .log file are stored in two different locations and have different naming conventions.
+    When doing troubleshooting, it is a pain to have to try to figure out which .log goes with which .conf.
+    Wouldn't it be nice, I thought, if the .log and .conf that belong together could actually be grouped together in the file system?
+    Perhaps have a directory for each Xorg start-up attempt that includes both the .log and the .conf and any notes or metadata (like whether it was successful or not)...
+
+Algorithm:
+----------
+To determine which .conf file was used on startup, look for the last-modified .log file and see which .conf it refers to. (Does anyone know of a more direct / better way?)
+
+To determine if it was successful...
+I thought about checking other logs to see if the gnome/gdm session loaded completely or something...
+Could check for 'Fatal server error:' or '(EE)' and unless found assume success...
+Have it copy in a low-level init script (sometime after X is started) assuming non-success, and then have GNOME's Startup Programs feature invoke this again with a 'success' flag, so if we get there, we assume success and rename the non-success directory to '*-good'.
+
+To do:
+------
+also copy dmesg or other logs useful for debugging?
+
+End
+	exit 1
+fi
+
+last_log=`ls -t /var/log/X*.log* | head -n1`
+date=`ls -l $last_log | gawk '{print $6 " " $7}' | sed 's/ /T/g'`
+now=`date +%Y%m%dT%H%M`
+last_conf=`grep 'Using config file:' $last_log | sed 's/^.*Using config file: "\(.*\)"/\1/g'`
+dir="/etc/X11/$date"
+
+#echo $last_log
+#echo $last_conf
+#echo $dir
+
+mkdir -p $dir
+
+cp --preserve $last_log $dir
+cp --preserve $last_conf $dir
+

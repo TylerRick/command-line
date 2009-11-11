@@ -1,0 +1,6 @@
+#!/bin/bash
+# This script will query pg_stat_activity and output a list of queries that are currently running,
+# ordered by how long they have been running. ("<IDLE>" queries will be excluded.)
+host=${1:-"dev"}
+echo "Host: $host"
+psql -h $host -f ~/svn/devscripts/bin/whose_queries_are_slowing_everything_down.sql -U www 89glass

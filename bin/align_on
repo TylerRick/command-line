@@ -1,0 +1,54 @@
+#!/usr/bin/ruby
+
+def usage
+  puts <<End
+Example:
+
+> rename -n 's/ /_/g' Notes*
+Notes - Part 5.txt renamed as Notes_-_Part_5.txt    
+Notes - Part 5 (copy).txt renamed as Notes_-_Part_5_(copy).txt        
+Notes - Part 5 (another copy).txt Notes_-_Part_5_(another_copy).txt
+Notes - Part 5 (3rd copy).txt renamed as Notes_-_Part_5_(3rd_copy).txt    
+
+> rename -n 's/ /_/g' Notes* | align_on 'renamed as'
+Notes - Part 5.txt                Notes_-_Part_5.txt    
+Notes - Part 5 (copy).txt         Notes_-_Part_5_(copy).txt        
+Notes - Part 5 (another copy).txt Notes_-_Part_5_(another_copy).txt
+Notes - Part 5 (3rd copy).txt     Notes_-_Part_5_(3rd_copy).txt    
+End
+  exit
+end
+
+usage if ARGV.size == 0
+
+#-------------------------------------------------------------------------------
+require 'rubygems' 
+require 'facets'
+require 'facets/blank'
+require 'facets/symbol/to_proc'
+require 'quality_extensions/object/ancestry_of_method'
+
+#---------------------------------------------------------------------------------------------------
+
+@strip = true
+
+lines = STDIN.lines.map do |line|
+  line_parts = line.chomp.split(ARGV[0])
+  line_parts.map!(&:strip) if @strip
+  line_parts
+end
+
+columns = lines.map(&:size).max
+
+widths = (0..columns-1).inject({}) do |hash, column|
+  hash[column] = lines.map{|line| line[column]}.map(&:length).max
+  hash
+end
+
+lines.each do |line_parts|
+  aligned_parts = line_parts.map_with_index do |part, i|
+    width = widths[i]
+    part.ljust(width)
+  end
+  puts aligned_parts.join(' ')
+end

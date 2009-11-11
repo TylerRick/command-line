@@ -1,0 +1,59 @@
+#!/usr/bin/ruby
+# Since the find command can only be used to search files for files bigger than a certain minimum size and not smaller than a certain maximum size, I decided to write this...
+# TODO: supposedly -size -100c should find files < 100 bytes in size??
+
+#---------------------------------------------------------------------------------------------------
+# Configuration
+
+start_dir = ARGV[0] || '.'
+
+max_size = ARGV[1].to_i || '10'
+
+display = ARGV[2] || 'file_with_size'
+sort_by = :name
+
+#---------------------------------------------------------------------------------------------------
+
+if ARGV.size == 0
+  puts <<End
+Usage: #{$0} start_dir [max_size]
+
+Example:
+  Search the entire filesystem for files smaller than 100 bytes:
+    sudo #{$0} / 100
+
+  Find files smaller than 10 bytes (default) within current directory:
+    #{$0} .
+End
+  exit
+end
+
+files_to_sizes = {}
+
+print "Searching..."; STDOUT.flush
+IO.popen(%[find "#{start_dir}" -print 2>/dev/null]) do |pipe|
+  pipe.each_line do |line|
+    filename = line.chomp
+    size = File.size(filename)
+    #puts "#{size} < #{max_size}?"
+    if size < max_size
+      files_to_sizes[filename] = size
+      if files_to_sizes.size % 10
+        print '.'; STDOUT.flush
+      end
+    end
+  end
+end
+puts
+puts 'No files found' if files_to_sizes.empty?
+
+files_to_sizes = files_to_sizes.sort {|a,b| b[0]<=>a[0]}
+files_to_sizes.each do |filename, size|
+  if display == 'file_with_size'
+    #puts "%20d MB %s" % [size / 1_000_000, filename]
+    puts "%20d B %s" % [size, filename]
+  else
+    # Just filename... So that you can pipe to xargs...
+    puts "%s" % [filename]
+  end
+end

@@ -1,0 +1,51 @@
+#!/bin/bash
+# Pipe a list of files or cgrep-style "search results lines" to this script and it will open them in vim
+
+mkdir -p ~/temp
+
+converter=~/public/shell/devscripts_bin/SearchResultsLineToVimSessionLineConverter.py
+if [ ! -e $converter ]; then
+  echo "Missing $converter"
+  exit 1;
+fi
+
+sessionFilename=~/temp/vimopen_session.vim
+searchTerm="$1"
+
+# If they supplied a search term, use it!
+echo "" > $sessionFilename
+if [[ "$searchTerm" != "" ]]; then
+  # Auto-highlight the search term (@/ is where vim stores the current search term)
+  echo "let @/ = \"$searchTerm\"" >> $sessionFilename		
+fi
+
+#---------------------------------------------------------------------------------------------------
+if file $( readlink /proc/$$/fd/0 ) | grep -q "character special"; then
+  # Standard input
+  # They must have copied and pasted a grep line and invoked us like this:
+  # vimopen   ./blah.rb:7:
+  echo "$@" | grep  '^b/\|^a/' && echo 'Using vimopen_converter_for_git_diff_filename.rb' && vimopen_converter_for_git_diff_filename.rb $sessionFilename "$@"
+  echo "$@" | grep  '^b/\|^a/' || echo "$@" | $converter >> $sessionFilename
+else
+
+  # Read the lines from stdin. They are assumed to be in the same format that cgrep outputs.
+  # Pass that on to the converter, which will output a vim session.
+  cat - | $converter >> $sessionFilename
+fi
+exitCodeFromConverter=$?
+
+#---------------------------------------------------------------------------------------------------
+if [[ "$exitCodeFromConverter" == "1" ]]; then
+  echo "vimopen: No files to open"
+  exit 1
+fi
+
+# TODO: make this output option (with -v only)
+cat $sessionFilename
+
+#---------------------------------------------------------------------------------------------------
+# Return stdin to the terminal (keyboard). Without this, vim will *break horribly* and will say "Vim: Warning: Input is not from a terminal"!
+exec 0</dev/tty		
+
+# Pass off control to vim
+exec vim -S $sessionFilename

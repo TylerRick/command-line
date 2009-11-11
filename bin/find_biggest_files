@@ -1,0 +1,52 @@
+#!/usr/bin/ruby
+
+# could also try: find $mountpoint -xdev -printf "%s %p\n" | sort -rn
+# http://coding.derkeiler.com/Archive/Perl/comp.lang.perl.misc/2007-11/msg00111.html
+
+#---------------------------------------------------------------------------------------------------
+# Configuration
+
+start_dir = ARGV[0] || '.'
+
+min_size = ARGV[1] || '10M'
+
+#---------------------------------------------------------------------------------------------------
+
+if ARGV.size == 0
+  puts <<End
+Usage: #{$0} start_dir [min_size]
+
+Example:
+  Search the entire filesystem for files bigger than 100MB:
+    sudo #{$0} / 100M
+
+  Find files bigger than 10MB (default) within current directory:
+    #{$0} .
+
+The following suffixes can be used for min_size:
+‘c’    for bytes
+‘k’    for Kilobytes (units of 1024 bytes)
+‘M’    for Megabytes (units of 1048576 bytes)
+‘G’    for Gigabytes (units of 1073741824 bytes)
+End
+  exit
+end
+
+files_to_sizes = {}
+
+print "Searching..."; STDOUT.flush
+IO.popen("find #{start_dir} -size +#{min_size} -print 2>/dev/null") do |pipe|
+  pipe.each_line do |line|
+    filename = line.chomp
+    files_to_sizes[filename] = File.size(filename)
+    if files_to_sizes.size % 10
+      print '.'; STDOUT.flush
+    end
+  end
+end
+puts
+
+files_to_sizes = files_to_sizes.sort {|a,b| b[1]<=>a[1]}
+files_to_sizes.each do |filename, size|
+  puts "%20d MB %s" % [size / 1_000_000, filename]
+end

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+#find $1 -not -regex ".*(\.svn|tmp).*" -exec egrep -n "$2" -H {} \;
+#find $1 -not -regex ".*(tmp).*" -exec egrep -n "$2" -H {} \;
+
+find $2 \( -type d -name "vehicles" -prune \) -o \( -type d -name "states2" -prune \) -o \( -type d -name "images" -prune \) -o \( -type d -name ".svn" -prune \) -o -exec egrep -n "$1" -H {} \;
+

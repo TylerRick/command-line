@@ -1,0 +1,6 @@
+#!/bin/bash
+# rmc ("rm confirm"): Interactive rm command that prints out what you are about to delete before you delete it so you don't accidentally delete something you really wanted to keep.
+for fileToDelete in $* ; do
+	head -n 20 $fileToDelete
+	rm -i $fileToDelete
+done

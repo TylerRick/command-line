@@ -1,0 +1,2 @@
+#!/bin/bash
+grep 'No route.*images' log/development.log | sed 's/.*images\/\(.*\)".*/\1/g' | xargs -I+ -n1 install -D public/images/avatar-groups.jpg public/images/+

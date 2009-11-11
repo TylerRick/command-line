@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+
+# Example:
+#   locate something | xargs diffall local_something 
+# For example, if you have a million copies of script/server (thanks to the rails generator's rampant duplication practices) and you remember that you customized one of them specially but don't remember which one it was or where, this can help you find it...
+#   locate script/server | xargs diffall
+# Although in this case, you could just about as effectively just do a...
+#   locate script/server | xargs head
+
+require 'facets/blank'
+
+base = ARGV.shift
+ARGV.each do |arg|
+  output = `diff '#{base}' '#{arg}'`
+  unless output.blank?
+    puts '______________________________________________________________________________________________'
+    puts   %(diff '#{base}' '#{arg}')
+    puts output
+  end
+end

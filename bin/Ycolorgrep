@@ -1,0 +1,23 @@
+#!/bin/bash
+# Deprecated. Now that I learned about grep --color
+
+# This is like cfgrep but it colorizes it
+
+if [ $# -lt 1 ]
+then
+	echo "Usage: `basename $0` expression [directory] [grepOptions] [findOptions]"
+	exit 1
+fi
+
+
+expression=${1}
+directory=${2:-"./"}
+grepOptions=${3:-""}
+findOptions=${4}
+#echo expression=$expression
+#echo directory=$directory
+#echo grepOptions=$grepOptions
+#echo findOptions=$findOptions
+#echo "-------------------------"
+
+cfgrep "$expression" "$directory" "$grepOptions" "$findOptions" | sed "s/\($expression\)/`echo -e "\033[1;33m"`\1`echo -e "\033[0m"`/gi"

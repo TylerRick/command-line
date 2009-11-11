@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Usage: ffind search_term
+# Finds all files within the current directory that contain the string "search_term".
+# Excludes .svn files automatically. 
+
+# This didn't work so well:
+#find . -not -regex ".*\.svn.*" -exec echo {} | grep "$1" \;
+
+# This does the same thing but is hard to read:
+#find .  \( -name "*.svn*" \) -o \( -name "*$1*" \) -exec echo {} \;
+
+find .  \( -not -name "*.svn*" \) -and \( -name "*$1*" \) -exec echo {} \;
+

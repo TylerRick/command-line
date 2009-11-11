@@ -1,0 +1,4 @@
+#!/bin/bash
+
+find $2 \( -type d -name "vehicles" -prune \) -o \( -type d -name "states2" -prune \) -o \( -type d -name "images" -prune \) -o \( -type f -regex ".*tmp$" -prune \) -o \( -type d -name ".svn" -prune \) -o -exec egrep -n$3 "$1" -H {} \;
+

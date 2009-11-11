@@ -1,0 +1,154 @@
+#!/bin/bash
+# A powerful, visual global search-and-replace tool powered by vim.
+
+function usage() 
+{
+	cat <<End
+Usage: vimsub [options] "files_to_change" search_expression replace_expression
+   or: vimsub cgrep [options] search_expression replace_expression
+   or: vimsub cgrep [options] {search_expression_for_grep} {search_expression_for_vim} {replace_expression}
+
+Example: 
+    vimsub -f "file1 file2" "old text" ""
+
+Options:
+--------
+
+   cgrep			Uses \`cgrep search_expression\` to get the files_to_change.
+   -f  (force)		Don't confirm replacements; do all substitutions non-interactively.
+   -i  (insensitive)	Case insensitive. Passes 'i' flag to cgrep and sets ignorecase option in vim.
+
+How do I make sure that my . is treated as a literal character and not as any any-character pattern?
+----------------------------------------------------------------------------------------------------
+
+    Just wrap it in quotes and backslash it, man!
+
+    So if you discover that this:
+        cgrep_vimsub person.user. person.
+
+    is matching things like 'person.username' and you want it to match a literal period after user' instead, just change it to this:
+        cgrep_vimsub 'person.user\.' person.
+
+Advanced regular expressions: capture groups
+---------------------------------------------
+
+    You can also use capture groups, like you would in vim.
+
+        > cgrep_vimsub 'File.join(\(.*\))' 'File.expand_path(File.join(\1))'
+
+        > cgrep_vimsub "database_\\(username\\|password\\)" "db_\1"'
+        # Replaces "database_username", "database_password" with "db_username", "db_password"'
+
+    Of course in those examples, it just so happened that the regular expressions we used were compatible with both rep and vim. This is not always
+    the case. See the following examples for what to do when you want to use a different search expression for grep than for vim.
+
+Advanced regular expressions: negative lookaheads
+-------------------------------------------------
+
+    > cgrep_vimsub user 'user\%(_type\)\@!' person
+    > cgrep_vimsub user 'user\%(_type\)\@!\%(name\)\@!' person
+    # Finds all files containing 'user' using grep, and then -- in those files -- uses *vim*'s regular expression 'substitute' command to replace
+    # all occurences of 'user' that AREN'T the beginning of the word 'user_type' or the word 'username' with 'person'
+
+End
+	exit 1
+
+}
+
+#---------------------------------------
+# Handle command-line arguments
+
+# Decide if we're going to run cgrep or not
+if [ "0$1" == "0cgrep" ]; then
+	get_file_list_from=cgrep
+	# Require 2 arguments: search_expression replace_expression
+	required_args=2
+	shift	# getopts exits as soon as its gets to the first non-opt, so strip the "cgrep" out of $1 so that $1 will be the start of the options (if any)
+elif [ "0$1" == "0cfgrep" ]; then
+	get_file_list_from=cfgrep
+	# Require 2 arguments: search_expression replace_expression
+	required_args=2
+	shift	# getopts exits as soon as its gets to the first non-opt, so strip the "cfgrep" out of $1 so that $1 will be the start of the options (if any)
+else
+	get_file_list_from=args
+	# Require 3 arguments: files_to_change search_expression replace_expression
+	required_args=3
+fi
+
+# Parse the options
+flags_to_pass_on=""	# These will be passed on to VimSub.py
+opt_count=0
+case_insensitive_flag=""
+while getopts ":f:i" options; do
+	case $options in
+		f ) flags_to_pass_on="$flags_to_pass_on -f";;
+		i ) case_insensitive_flag="i"
+        flags_to_pass_on="$flags_to_pass_on -i";;
+		* ) print "Unrecognized option"
+			usage
+			exit 1;;
+	esac
+	let "opt_count++"
+done
+# Remove opts from args so that $1 is still our first "real" (non-opt) argument
+if (( $opt_count >= 1 )); then
+	for a in `seq $opt_count`; do shift; done
+fi
+
+if (( $# < $required_args )); then
+	echo "vimsub: Wrong number of arguments (should be >= $required_args)."
+	echo "\$1=$1"
+	echo "\$2=$2"
+	echo "\$3=$3"
+	usage
+fi
+
+if [[ $get_file_list_from = "cgrep" || $get_file_list_from = "cfgrep" ]]; then
+    if (( $# == 2 )); then
+        grep_search_expression=$1
+        vim_search_expression=$1
+        replace_expression=$2
+    fi
+    if (( $# == 3 )); then
+        grep_search_expression=$1
+        vim_search_expression=$2
+        replace_expression=$3
+    fi
+else
+	files_to_change=$1
+	vim_search_expression=$2
+	replace_expression=$3
+fi
+
+#---------------------------------------
+if [[ $get_file_list_from = "cgrep" ]]; then
+	echo "Searching for files containing \"$grep_search_expression\"..."
+	files_to_change=`cgrep "$grep_search_expression" . l${case_insensitive_flag}`
+elif [[ $get_file_list_from = "cfgrep" ]]; then
+	echo "Searching for files containing \"$grep_search_expression\"..."
+	files_to_change=`cfgrep "$grep_search_expression" . l${case_insensitive_flag}`
+fi
+
+#---------------------------------------
+
+# Delete it now so that we can use its existence as a test of whether VimSub.py had errors or not.
+rm -f ~/tmp/vimsub.vim
+
+echo "Executing: echo $files_to_change | VimSub.py \"$vim_search_expression\" \"$replace_expression\" $flags_to_pass_on"
+echo $files_to_change | VimSub.py "$vim_search_expression" "$replace_expression" $flags_to_pass_on
+
+#---------------------------------------
+# If VimSub.py was successful, then start the vim script.
+if [ -f ~/tmp/vimsub.vim ]; then
+	# Give one last chance to bail out
+	echo "Execute: \`vim -S ~/tmp/vimsub.vim\`"
+	echo "-----------------------------------------------------------"
+	cat ~/tmp/vimsub.vim
+	echo "-----------------------------------------------------------"
+	echo -n "Do you want to proceed?  (Ctrl+C to exit / Enter to continue) "
+	read
+	vim -S ~/tmp/vimsub.vim
+else
+	echo 'Error: ~/tmp/vimsub.vim does not exist'
+fi
+

@@ -1,0 +1,2 @@
+echo "dpkg --get-selections | grep -i \"$@\""
+dpkg --get-selections | grep -i "$@"

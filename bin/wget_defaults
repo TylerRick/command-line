@@ -1,0 +1,20 @@
+#!/bin/bash
+source `dirname $0`/set_firefox_user_agent
+#--http-user=$user --http-passwd=$password \
+#-erobots=off
+#--no-host-directories
+#-X /cgi-bin
+#--timestamping \
+#--no-clobber \
+#--backup-converted \
+#--span-hosts \
+wget \
+    --user-agent "$user_agent" \
+		--random-wait --wait=1 \
+    --debug -o ~/tmp/wget_log \
+		--html-extension \
+		--convert-links \
+		--page-requisites \
+		-r -l 2 \
+    "$@"
+

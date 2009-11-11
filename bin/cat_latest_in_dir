@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# Usage: cat_latest_in_dir [<dir>] [<options_for_ls>]
+# Currently doesn't work with globs, like 'cat_latest_in_dir logs/*.log'
+
+# Example:
+# > cat_latest_in_dir logs/
+# (contents of logs/latest_file)
+
+# Defaults to ./ if no directory given
+# > cat_latest_in_dir
+# (contents of ./latest_file)
+
+# To do: Use simple '| xargs cat' version unless $1 is a directory.
+#ls_latest "$@" | xargs cat
+
+# This version requires $1 to be a plain dir, not a glob.
+ls_latest "$@" | xargs -n1 -I {} cat ${1:-.}/\{\}
+

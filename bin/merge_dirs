@@ -1,0 +1,314 @@
+#!/usr/bin/ruby
+
+#---------------------------------------------------------------------------------------------------
+def usage
+  puts <<End
+Usage: #{File.basename($0)} [<options>] <source_dir> <dest_dir>"
+
+Example:
+  # Restore from a backup, overwriting everything that's already there.
+  #{File.basename($0)} -v -f /home/me.backup /home/me
+
+  # Merge everything from stuff.from_bob, and automatically append .from_bob in case of a conflict.
+  #{File.basename($0)} -v -a --suffix .from_bob stuff.from_bob stuff
+
+  # A long mv that gets interrupted (by a system crash, for instance):
+  mv dir /somewhere/else
+  # It *might* be safe to do rm -rf /somewhere/else/dir and then retry the mv, because mv *probably* doesn't remove the source files until the entire operation is complete. However, if you're in doubt, you could also do this:
+  #{File.basename($0)} -d dir /somewhere/else/dir
+
+Merges two directory trees. Similar to 'cp <source_dir>/. <dest_dir>' except that it moves instead of copies.
+
+Also similar to 'mv <source_dir>/* <dest_dir>' but rather than complaining if a subdirectory from <source_dir> exists in <dest_dir>, it will silently merge their contents, stopping only if a file would be overwritten.
+
+You can control what happens when a file already exists under <dest_dir> using the --no-overwrite and -f/--overwrite switches.
+By default, it will stop and ask you what to do. (If --verbose, it will even show the output of ls -l for each file so you can compare sizes, permissions, etc.)
+If -f/--overwrite is supplied:                       it will overwrite the file under <dest_dir>, replacing it with the file from <source_dir>.
+If -a/--add-suffix is supplied:                          it will append <suffix> (supplied with --suffix <suffix) to the destination filename when it moves the file.
+If -s/--no-overwrite/--skip is supplied:             it will skip moving that file and the source from <source_dir> will be left in <source_dir>.
+If -d/--delete-source-if-already-exists is supplied: it will skip moving that file and the source from <source_dir> will be removed. (Use this if you trust the integrity of the files in <dest_dir> more than those in <source_dir>, f.e.)
+
+Other options:
+--suffix <suffix>         Append <suffix> to destination filename if you do a "add-suffix".
+-v/--verbose              Show more details about what's going on. (Highly recommended.)
+--no-act/--noop/-n        Doesn't actually move/delete any files. Shows you what it WOULD have done. (Implies --verbose.)
+
+--------------------------------------------------
+How does it to compare to rsync? How is it different? What does it do better?
+
+I don't know. I need to find answers to those questions still.
+
+I don't think rsync has equivalents to all the -a/-s/-d options though.
+
+--------------------------------------------------
+Known bugs:
+* it doesn't handle broken symlinks nor special files (sockets, device files) as well as it could. The standard mv command seems to have no problem with them, however, so this must be a bug in Ruby's FileUtils library.
+* other bugs almost certainly exist
+End
+end
+
+#---------------------------------------------------------------------------------------------------
+# To do:
+# * Write tests
+# * use system's mv command always instead of Pathname.mv ?
+
+
+#---------------------------------------------------------------------------------------------------
+require 'pathname'
+require 'rubygems'
+require 'quality_extensions/pathname'
+require 'quality_extensions/string/shell_escape'
+require 'quality_extensions/exception/inspect_with_backtrace'
+require 'rubygems'
+require 'colored'
+
+
+#---------------------------------------------------------------------------------------------------
+
+# Monkey patch to fix what I believe is a bug:
+module FileUtils
+  def copy_entry(src, dest, preserve = false, dereference_root = false, remove_destination = false)
+    Entry_.new(src, nil, dereference_root).traverse do |ent|
+      destent = Entry_.new(dest, ent.rel, false)
+      File.unlink destent.path if remove_destination && File.file?(destent.path)
+      ent.copy destent.path
+      ent.copy_metadata destent.path if preserve && !ent.symlink?
+    end
+  end
+  module_function :copy_entry
+end
+
+class Pathname
+  def shell_escape; to_s.shell_escape; end
+end
+
+#---------------------------------------------------------------------------------------------------
+
+
+class TreeMerger
+  attr_accessor :options
+
+  def initialize(source, dest)
+    @source          = Pathname.new(source).cleanpath
+    #puts Dir.getwd
+    #puts @source
+    @source_absolute = @source.absolutize
+    @dest            = Pathname.new(dest).cleanpath.absolutize
+    @options = {}
+  end
+
+  def dest(path)
+    @dest + path
+  end
+
+  def merge
+    puts "Merging '#{@source}' to '#{@dest}'".green if verbose?
+    puts "Options: #{@options.inspect}" if verbose?
+
+    # TODO: document: why do we chdir?
+    # Maybe so that the Pathname objects returned by find are nice and relative to that dir
+    # But couldn't we simply relative the Pathname after the fact if we didn't do chdir?
+    # Disadvantages: have to absolutize @dest or it will think @dest is relative to working dir!
+    begin
+      Dir.chdir @source
+    rescue Errno::ENOENT
+      puts $!
+      exit 1
+    end
+    Pathname('.').find do |path|
+      dest = dest(path)
+      overridden_dest = nil
+      suffix = self.suffix
+
+      if path.directory?
+        puts "Examining source dir '#{@source + path}'".green if verbose?
+        if !dest.exist?
+          puts "Destination directory '#{dest}' doesn't exist. Creating...".yellow if verbose?
+          dest.mkdir unless no_act?
+        end
+
+      else # is a file
+        action = nil
+        if dest.exist?
+          if verbose? || if_already_exists == :prompt
+            print "Destination file '".red + "#{dest}".bold.red + "' already exists. ".red 
+
+            if verbose?
+              puts
+              system %(ls -l #{(@source_absolute + path).shell_escape})
+              system %(ls -l #{dest.shell_escape})
+            end
+
+            if if_already_exists == :prompt
+              print "Overwrite with source, skip, add suffix#{" (append '#{suffix}' to filename)" if suffix}, or delete source? [o/S/a/d]> "
+              response = STDIN.gets
+              case response[0..0].downcase
+              when 'o'
+                action = :overwrite
+              when 'd'
+                action = :delete_source
+              when 'a'
+                action = :add_suffix
+                if suffix.nil?
+                  print "Suffix (ex.: .suffix)? "
+                  suffix = STDIN.gets.chomp
+                end
+              else
+                action = :skip
+              end
+            else
+              action = if_already_exists
+            end
+          end
+
+
+          case action
+          when :overwrite
+            puts "Overwriting '#{dest.to_s.bold}' with '#{(@source + path).to_s.bold}'" if verbose?
+          when :add_suffix
+            overridden_dest = dest.add_suffix(suffix)
+          when :delete_source
+            puts "Deleting source '#{(@source + path).to_s.bold}'" if verbose?
+            path.unlink unless no_act?
+          else
+            puts "Skipping" if verbose?
+          end
+
+          if overridden_dest
+            puts "Moving to overridden destination '#{overridden_dest.to_s.bold}'" if verbose?
+            if overridden_dest.exist?
+              STDERR.puts "'#{overridden_dest.to_s.bold}' already exists. Please select a different option.".red
+              redo
+            end
+          end
+
+        else # !dest.exist?
+          # No conflict? No problem!
+        end
+
+        unless action == :skip || action == :delete_source
+          mv_options = {}
+          mv_options[:verbose] = true if verbose?
+          mv_options[:noop] = true if no_act?
+          begin
+            path.mv((overridden_dest||dest), mv_options)
+          rescue Exception
+            STDERR.puts "Encountered exception while trying to mv #{@source + path} #{(overridden_dest||dest)}:"
+            if true # $!.message =~ /^cannot handle device file|^cannot handle socket|^Too many levels of symbolic links|^cannot handle FIFO/
+              STDERR.puts $!.inspect_with_backtrace
+              mv_command = "mv #{path} #{(overridden_dest||dest)}"
+              STDERR.puts "Falling back to system mv command: #{mv_command}"
+              system(mv_command)
+            else
+              raise
+            end
+          end
+        end
+
+      end # is a file
+    end # Pathname('.').find do |path|
+
+    #options[:verbose] = true
+    puts "Removing empty directories from source..." if verbose?
+    dirs_to_try_deleting = []
+    # start at @source instead of '.' because we can't rmdir '.'; so that we don't get '/usr/lib/ruby/1.8/pathname.rb:978:in `rmdir': Invalid argument - . (Errno::EINVAL)'
+    Pathname(@source_absolute).find do |path|
+      if path.directory?
+        dirs_to_try_deleting << path
+      end
+    end
+    # Delete deepest dirs first so that by the time we get back up to the containing dirs, they too will hopefully be empty
+    dirs_to_try_deleting.reverse.each do |path|
+      if path.symlink?
+        puts "Source directory '#{path}' is actually a directory. Ignoring...".yellow if verbose?
+      else
+        if path.children.empty?
+          puts "Source directory '#{path}' is empty. Deleting...".green if verbose?
+          path.rmdir unless no_act?
+        else
+          puts "Source directory '#{path}' is not empty.".yellow if verbose?
+        end
+      end
+    end
+
+
+    #@source.children.each do |dir|
+    #  puts "Considering source dir '#{dir}'".magenta if verbose?
+    #  #system %[ls -al "#{dir}"]
+    #  dest_dir = @dest + dir.basename
+    #
+    #  to_move = dir.children
+    #  if to_move.empty?
+    #    #(puts "Empty dir: Deleting...".yellow; Pathname.new(dir).rmdir) 
+    #  else
+    #    puts "Moving these files to '#{dest_dir}'".green if verbose?
+    #    puts to_move
+    #    if dest_dir.exist?
+    #      #command = %[mv "#{dir}"/* "#{dest_dir}"]
+    #    else
+    #      puts "#{dest_dir} doesn't exist.".yellow if verbose?
+    #      #command = %[mv "#{dir}" "#{dest_dir}"]
+    #    end
+    #
+    #  end
+    #
+    #  #puts dest_dir.green
+    #  #system %[ls -al "#{dest_dir}"]
+    #
+    #  puts
+    #end
+
+  end
+
+  # TODO: condense
+  def verbose?; options[:verbose]; end
+  def no_act?;  options[:no_act]; end
+  def if_already_exists; options[:if_already_exists]; end
+  def suffix; @options[:suffix]; end
+end
+
+#---------------------------------------------------------------------------------------------------
+if $0 == __FILE__
+  require 'getoptlong'
+  opts = GetoptLong.new(
+      [ '--no-overwrite', '--skip', '-s',          GetoptLong::NO_ARGUMENT ],
+      [ '--delete-source-if-already-exists', '-d', GetoptLong::NO_ARGUMENT ],
+      [ '--overwrite', '-f',                       GetoptLong::NO_ARGUMENT ],
+      [ '--add-suffix', '-a',                      GetoptLong::NO_ARGUMENT ],
+      [ '--suffix',                                GetoptLong::REQUIRED_ARGUMENT ],
+      [ '--verbose', '-v',                         GetoptLong::NO_ARGUMENT ],
+      [ '--quiet', '-q',                           GetoptLong::NO_ARGUMENT ],
+      [ '--no-act', '--noop', '-n',                GetoptLong::NO_ARGUMENT ]
+  )
+  options = {}
+  options[:if_already_exists] = :prompt
+  opts.each do | opt, arg |
+    case opt
+    when '--no-overwrite', '--skip', '-s'
+      options[:if_already_exists] = :skip
+    when '--overwrite', '-f'
+      options[:if_already_exists] = :overwrite
+    when '--add-suffix', '-a'
+      options[:if_already_exists] = :add_suffix
+    when '--suffix'
+      options[:suffix] = arg
+    when '--delete-source-if-already-exists', '-d'
+      options[:if_already_exists] = :delete_source
+    when '--verbose', '-v'
+      options[:verbose] = true
+    when '--quiet', '-q'
+      options[:quiet] = true
+    when '--no-act', '--noop', '-n'
+      options[:no_act] = true
+      options[:verbose] = true
+    end
+  end
+
+  if ARGV.size < 2
+    usage; exit 1
+  end
+
+  merger = TreeMerger.new(ARGV[0], ARGV[1])
+  merger.options = options
+  merger.merge
+end

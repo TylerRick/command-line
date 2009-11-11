@@ -1,0 +1,34 @@
+#! /bin/bash
+#http://linuxgazette.iatp.by/issue13/issue13.html
+    ## SLEW: Space Low Early Warning
+    ##  by James T. Dennis, 
+    ##  Starshine Technical Services
+    ##  
+    ## Warns if any filesystem in df's output
+    ## is over a certain percentage full --
+    ## mails a short report -- listing just 
+    ## "full" filesystem.
+    ## Additions can be made to specify
+    ## *which* host is affected for 
+    ## admins that manage multiple hosts
+
+adminmail="root"
+    ## who to mail the report to
+
+
+threshold=${1:?"Specify a numeric argument"}
+    ## a percentage -- *just the digits*
+
+# first catch the output in a variable
+fsstat=`/bin/df`
+
+echo "$fsstat" \
+    | gawk '$5 + 0 > '$threshold' {exit 1}'  \
+   || echo "$fsstat" \
+    | { echo -e "\n\n\t Warning: some of your" \
+        "filesystems are almost full \n\n" ;
+        gawk  '$5 + 0 > '${threshold}' + 0 { print $NF, $5, $4 }' } \
+    | /bin/mail -s "SLEW Alert" $adminmail
+
+exit
+

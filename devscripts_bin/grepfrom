@@ -1,0 +1,10 @@
+#!/bin/bash
+# Prints the *first* line matching expression and all *following*.
+
+if [ $# -eq 0 ]; then exec grepfromuntil --help; fi
+
+#. `which grepfromuntil`
+exec grepfromuntil --from "$@"
+
+# Old (simple) version:
+# exec cat - | grep -A10000000 -- "$*"

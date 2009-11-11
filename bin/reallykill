@@ -1,0 +1,66 @@
+#!/bin/sh
+# http://ubuntu-snippets.blogspot.com/2008/08/useless-use-of-kill-9.html
+#
+# $Id: reallykill,v 1.2 2004/10/11 09:36:48 jmates Exp $
+#
+# The author disclaims all copyrights and releases this script into the
+# public domain.
+#
+# Kills the specified processes by starting with the TERM signal and
+# only if necessary working up to the violent KILL signal. For more
+# information, see:
+#
+# http://sial.org/howto/shell/kill-9/
+
+# To do:
+# * allow the delay between signal attempts/escalations to be specified
+# * allow starting signal to be specified (default=TERM)
+# * allow verbosity to be specified, similar to killall's options
+# * why doesn't it work when I try to reallykill %1
+
+# Use killall -w instead?
+#killall
+#       -w, --wait
+#			               Wait for all killed processes to die. killall checks once per second if any of the killed processes still exist and only returns if none are left.  Note that killall may wait forever if the signal was ignored, had  no
+#										               effect, or if the process stays in zombie state.
+
+# Rationale:
+# Because you shouldn't have to do ugly stuff like this to handle the case when it may take a while to shut down or may not even already be running:
+#	killall streamripper; sleep 0.5; killall -9 streamripper || (sleep 5; killall -9 streamripper); streamripper
+
+if [ -z "$1" ]; then
+  echo "usage: `basename $0` pid [pid ..]" >&2
+  exit 100
+fi
+
+cycle_kill () {
+  PID=$1
+  RETVAL=0
+
+  for signal in "TERM" "INT" "HUP" "KILL"; do
+    echo kill -$signal $PID
+
+    kill -$signal $PID
+	# Apparently kill is supposed to return 0 if it actually kills something? Well, that doesn't seem to be the case for me... !
+	# For example, when I do 'kill streamripper', it says "shutting down" (acknowledging that it *got* the message) and exits 0, but the process continues to run.
+#    RETVAL=$?
+#    [ $RETVAL -eq 0 ] && break
+
+	psgrep $PID | grep -v reallykill
+	if [ $? -eq 0 ]; then
+		RETVAL=1
+	else
+		RETVAL=0
+	fi
+    [ $RETVAL -eq 0 ] && break
+
+    echo "warning: kill failed: pid=$PID, signal=$signal" >&2
+    sleep 1
+  done
+
+  return $RETVAL
+}
+
+for pid in "$@"; do
+  cycle_kill $pid
+done

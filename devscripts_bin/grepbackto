@@ -1,0 +1,8 @@
+#!/bin/bash
+# Prints the *last* line matching expression and all *following*.
+
+if [ $# -eq 0 ]; then exec grepfromuntil --help; fi
+
+#. `which grepfromuntil`
+exec grepfromuntil --back-to "$@"
+

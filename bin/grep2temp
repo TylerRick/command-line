@@ -1,0 +1,5 @@
+#!/bin/bash
+
+#find $2 \( -type d -name "changes" -prune \) -o \( -type d -name "vehicles" -prune \) -o \( -type d -name "states2" -prune \) -o \( -type d -name "images" -prune \) -o \( -type d -name ".svn" -prune \) -o \( -type f -regex ".*tmp$" -prune \) -o -exec egrep -n "$1" -H {} \;
+find $2 \( -type d -name "89glass*" -prune \) -o \( -type d -name "changes" -prune \) -o \( -type d -name "vehicles" -prune \) -o \( -type d -name "states2" -prune \) -o \( -type d -name "images" -prune \) -o \( -type d -name ".svn" -prune \) -o \( -type f -regex ".*tmp$" -prune \) -o -exec egrep -n "$1" -H {} \;
+

@@ -1,0 +1,3 @@
+#!/bin/bash
+#echo -n "Your external IP Address is: "
+curl http://whatismyip.com/automation/n09230945.asp

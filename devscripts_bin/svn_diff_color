@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Colorizes svn diff commands (+ lines are blue; - lines are red)
+# Found at:
+#   http://www.pjhyett.com/articles/2006/06/16/colored-svn-diff
+#   http://colordiff.sourceforge.net/
+# Suggestion:
+#   alias svndiff="svn_diff_color"
+#   alias sd="svndiff"
+
+svn diff --diff-cmd=colordiff $@
+
+# Notes:
+# I changed the colors in /etc/colordiffrc to be more readable:
+#	plain=white
+#	newtext=green
+#	oldtext=red
+#	diffstuff=cyan
+#	cvsstuff=magenta
+# Feel free to tweak it if you don't like it.

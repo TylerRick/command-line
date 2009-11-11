@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# Usage: tail_latest_in_dir [<dir>] [<options_for_tail>]
+
+# Example:
+# > tail_latest_in_dir logs/
+# (contents of logs/latest_file)
+
+# Defaults to ./ if no directory given
+# > tail_latest_in_dir
+# (contents of ./latest_file)
+
+# Tail "follow" that latest file
+# > tail_latest_in_dir log -f
+# (output from tail -f log/latest_file)
+
+dir=${1:-.}
+shift
+
+# This version requires $1 to be a plain dir, not a glob.
+ls_latest $dir | xargs -n1 -I {} tail "$@" $dir/\{\}
+

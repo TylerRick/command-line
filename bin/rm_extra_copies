@@ -1,33 +1,70 @@
 #!/usr/bin/ruby
-# Copyright 2008 Tyler Rick
-# License: GPL
 
-require 'rubygems'
 require 'getoptlong'
-require 'facets/time'
-require 'colored'
+require 'rubygems'
+require 'facets'
+require_local 'rm_extra_copies'
 
-opts = GetoptLong.new(
-    [ '--hourly',                       GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--daily',                        GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--weekly',                       GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--monthly',                      GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--yearly',                       GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--use-filename-timestamp',       GetoptLong::NO_ARGUMENT ],
-    [ '--use-file-system-timestamp',    GetoptLong::NO_ARGUMENT ],
-    [ '--time-format',                  GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--pattern',                      GetoptLong::REQUIRED_ARGUMENT ],
-    [ '--exclude',                      GetoptLong::REQUIRED_ARGUMENT ]
-)
-
+# vim: textwidth=150
 def help
   puts <<End
 Synopsis:
 ---------
 
-rm_extra_copies [--hourly=n] [--daily=n] [--weekly=n] [--monthly=n] dirs...
+rm_extra_copies [options] dirs...
+
+Example:
+rm_extra_copies --daily 5 --monthly 12 /path/to/backups
+
 
 rm_extra_copies will keep the specified number of time-stamped copies from each "time bucket" and remove all older copies.
+
+So even if you don't actually make any weekly backups, as long as you make daily or hourly backups, you will at least *have* weekly backups which
+you can keep. This will let you keep, for example, *all* the weekly backups but only 6 days worth of daily backups.
+
+When you specify --weekly=3, it means go back for 3 weeks and keep one backup from each week.
+So it will keep the most recent file from the current week, the most recent file from the previous week, etc.
+
+Use a * instead of a number to go back all the way to the oldest [week] represented in that directory and keep 1 copy from each [week] visited
+along the way. Note that it usually only makes sense to do this for the largest time interval being used. (It wouldn't make any sense to say
+--hourly=* --daily=3 because the --daily=3 will cause no files to be kept that wouldn't already be kept due to the --hourly.)
+
+The same file may satisfy more than 1 quota. So if you set them all to 1, they will all be satisfied by the same file: the most recent backup in the
+directory. For that reason, 2 is probably the minimum you'd want to set any of these to.
+
+
+Options:
+--------
+  --help                   Print this message
+  --minutely/--hourly/--daily/--weekly/--monthly/--yearly quota/frequency  
+                           Keep n number of [daily] backups or * to keep all
+  --<custom-interval>=<n>
+  --force                  Don't ask for confirmation before deleting. Use this if you put this command in a crontab and you are very sure you know 
+                           what it will do.
+  --now                    Use a different date/time as now.
+  --get-time-from filename Takes the time from the filename. It must be present in the filename and formatted in %Y%m%dT%H%M format.
+  --get-time-from file_system
+                           Uses the mtime of the file.
+  --no-color               Use a different date/time as now.
+  --last/--latest          Take the last (latest) candidate in each time interval (default). 
+  --first/--earliest       Take the first (earliest) candidate in each time interval (not default).
+
+By default, days start at the beginning of day, weeks to beginning of week, etc.
+
+To do: 
+  --identical              Compares the md5 digest of each pair of files and removes any files that have the same (and therefore probably are identical) -- except for the oldest/newest one.
+  --consec-identical       Same as --identical except only checks and removes consecutive/neighboring files to see if they are identical.
+  --align=<?>
+      add option to align the time ranges (days, etc.) from "now" rather than at the beginning of the day, etc. So "day" would actually be "the most
+recent 24-hour period, beginning exactly 24 hours ago and ending right now".
+
+
+Format of quota/frequency
+-------------------------
+
+TODO: allow crontab-style specifiers like --hourly=2/4 to keep 2 4-hourly backups, or
+--hourly=*/12 to keep *all* 12-hourly backups (= keep 2 backups per day).
+
 
 How your files/directories must be organized
 --------------------------------------------
@@ -68,153 +105,33 @@ determine how it happened and restore a certain chunk of data from that old pre-
 
 Well, this tool will help you to keep around SOME old copies, without keep around as many as you keep of the more recent ones.
 
-Options:
-  --help                 Print this message
 End
   exit 0
 end
 
 
-require 'fileutils'
-require 'rbconfig'
-require 'tmpdir'
-require 'pathname'
 
-class Time
-  def to_s
-    #strftime("%Y%m%dT%H%M%S")
-    strftime("%Y%m%d %H%M")
-  end
-end
-
-class Bucket
-  attr_accessor :quota, :still_needed, :keepers
-  def initialize(quota)
-    self.quota = self.still_needed = quota
-    self.keepers = []
-  end
-end
-
-# PruneBackups?
-class RmExtraCopies
-  # These are actually the "quota remaining" counts for each bucket, not the buckets themselves
-  @@time_buckets = [:hourly, :daily, :weekly, :monthly, :yearly]
-  attr_accessor :dir, *@@time_buckets
-
-  def initialize
-    #@dirs = []
-    @@time_buckets.each do |time_bucket|
-      send "#{time_bucket}=", 0
-      # Bucket.new
-    end
-  end
-
-  def time_buckets_and_values
-    @@time_buckets.map do |time_bucket|
-      [time_bucket, unit(time_bucket), send("#{time_bucket}")]
-    end.reject do |name, unit, quota|
-      quota == 0
-    end
-  end
-
-  def bucket_remaining(bucket_name, decr = nil)
-    send("#{bucket_name}=", send("#{bucket_name}") - decr) if decr
-    send "#{bucket_name}"
-  end
-
-  def unit(bucket_name)
-    {
-      :hourly  => :hours,
-      :daily   => :days,
-      :weekly  => :weeks,
-      :monthly => :months,
-      :yearly  => :years,
-    }[bucket_name.to_sym]
-  end
-
-  def time_bucket_values
-    @@time_buckets.map do |time_bucket|
-      send "#{time_bucket}"
-    end
-  end
-
-  def bucket(name)
-    @buckets[name]
-  end
-
-  def now
-    Time.now
-  end
-
-  def delete_all_except(keepers)
-    @all_files.each do |file|
-      if keepers.include? file
-        puts "#{file}: in _ bucket".green
-      else
-        puts "#{file}: will delete".red
-      end
-    end
-  end
-  def delete(files)
-    puts "Deleting files: #{files.join(', ')}..."
-  end
-
-  def run
-    raise "Must keep at least 1 file from at least one time bucket" if time_bucket_values.empty?
-
-    Dir.chdir @dir do
-      puts "Entering #{@dir}..."
-      @all_files = Dir['*'].sort
-
-      files_times = @all_files.map do |filename|
-        if filename =~ /(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?/
-          y,m,d, h,i,s = $1,$2,$3, $4,$5,$6
-          time = Time.mktime(y,m,d, h,i,s)
-          [filename, time]
-        end
-      end.sort do |a, b|
-        a[1] <=> b[1]
-      end.reverse
-
-      # Fill each bucket until its quota is met
-      keepers = []
-      max_tries = @all_files.size
-      time_buckets_and_values.each do |name, unit, quota|
-        puts "Trying to fill quota of #{quota} for #{name} bucket..."
-        time_max = now
-        time_min = now.ago(1, unit)
-        tries = 0
-
-        while tries < max_tries
-          puts "Checking #{time_min} .. #{time_max}"
-          new_keepers = files_times.detect {|file, file_time|
-            time_min < file_time &&
-                       file_time <= time_max
-          }
-          if [new_keepers].any?
-            puts "Keeping #{keepers}"
-            keepers.concat [new_keepers]
-            bucket_remaining(name, [new_keepers].size)
-          end
-
-          time_max = time_min
-          time_min = time_min.ago(1, unit)
-          tries += 1
-          quota = bucket_remaining(name)
-          (puts 'Filled quota!'; break) if quota == 0
-        end
-      end
-
-      raise "Didn't find any files to keep?!" unless keepers.any?
-      delete_all_except(keepers.map {|path| path[0]})
-    end
-
-  end
-end
-
-command = RmExtraCopies.new
+quotas = {}
 
 help if ARGV.empty?
+
+opts = GetoptLong.new(
+    [ '--minutely',                     GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--hourly',                       GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--daily',                        GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--weekly',                       GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--monthly',                      GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--yearly',                       GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--get-time-from',                GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--last',  '--latest',            GetoptLong::NO_ARGUMENT ],
+    [ '--first', '--earliest',          GetoptLong::NO_ARGUMENT ],
+    [ '--force', '-f',                  GetoptLong::NO_ARGUMENT ],
+    [ '--no-color',                     GetoptLong::NO_ARGUMENT ],
+    [ '--time-format',                  GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--pattern',                      GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--exclude',                      GetoptLong::REQUIRED_ARGUMENT ],
+    [ '--now',                          GetoptLong::REQUIRED_ARGUMENT ]
+)
 
 opts.each do | opt, arg |
   case opt
@@ -222,27 +139,31 @@ opts.each do | opt, arg |
   when '--help'
     help
 
-  when '--hourly'
-    command.hourly = arg.to_i
+  when '--force', '-f'
+    RmExtraCopies.force = true
 
-  when '--daily'
-    command.daily = arg.to_i
+  when '--no-color'
+    RmExtraCopies.color = false
 
-  when '--weekly'
-    command.weekly = arg.to_i
+  when *RmExtraCopies.options.map {|o| "--#{o.to_s.gsub(/_/, '-')}"}
+    name = opt.gsub(/^--/, '').to_sym
+    RmExtraCopies.send("#{name}=", arg)
 
-  when '--monthly'
-    command.monthly = arg.to_i
-
-  when '--yearly'
-    command.yearly = arg.to_i
-
+  when *RmExtraCopies.allowed_bucket_names.map {|o| "--#{o}"}
+    name = opt.gsub(/^--/, '').to_sym
+    if arg == '*'
+      #quotas[name] = :all
+      quotas[name] = '*'
+    else
+      quotas[name] = arg.to_i
+    end
   end
 end
 
 dirs = ARGV
 raise "Must specify at least one directory" if dirs.empty?
 dirs.each do |dir|
-  command.dir = dir
+  command = RmExtraCopies.new(dir, quotas)
   command.run
 end
+

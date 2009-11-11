@@ -1,0 +1,15 @@
+#!/bin/bash
+dirname $0
+source `dirname $0`/set_firefox_user_agent
+curl \
+--user-agent "$user_agent" \
+--header 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
+--header 'Accept-Language: en-us,en;q=0.8,de-de;q=0.5,de;q=0.3' \
+--header 'Accept-Charset: UTF-8,*' \
+--header 'Keep-Alive: 300' \
+--header 'Connection: keep-alive' \
+--show-error \
+ "$@"
+
+#--header 'Accept-Encoding: gzip,deflate' \
+

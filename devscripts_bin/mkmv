@@ -1,0 +1,15 @@
+#!/bin/bash
+
+function usage() {
+	echo "------------------------------------"
+	echo "mkmv  --  mkdir + mv"
+	echo "Usage:"
+	echo "		mkmv sourcePath destDir"
+	exit 1
+}
+
+if [ $# -lt 2 ]; then
+	usage
+fi
+
+mkdirMvOrCp mv $1 $2

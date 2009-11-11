@@ -1,0 +1,2 @@
+source script/config
+vimdiff $external_dir/$1 $local_dir/$1

@@ -1,0 +1,10 @@
+#!/usr/bin/ruby
+
+require "cgi"
+
+def url_decode(s)
+  s = CGI::unescape(s)
+end
+
+puts url_decode(STDIN.read)
+

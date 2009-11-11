@@ -1,0 +1,4 @@
+# rsync with the options I usually like to have
+echo rsync -a --recursive --compress "$@"
+# --progress ? --partial?
+     rsync -a --recursive --compress "$@"

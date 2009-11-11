@@ -1,0 +1,5 @@
+#!/bin/bash
+
+for subDir in ~/svn/*; do
+	/usr/local/bin/svn status -u $subDir
+done

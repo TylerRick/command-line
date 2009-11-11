@@ -1,0 +1,5 @@
+dir=/data/backup/todoist.com/
+file=`ls -t $dir|head -n 1`
+echo $file
+cat $dir/$file | sed 's/,/,\n/g'
+#| grep 'url\|title' --color=auto

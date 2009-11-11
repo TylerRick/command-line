@@ -1,0 +1,65 @@
+#!/bin/bash
+
+function usage() {
+	echo "------------------------------------"
+	echo "mkdirMvOrCp  --  mkdir + cp/mv"
+	echo "Usage:"
+	echo "		mkdirMvOrCp cp/mv sourcePath destDir"
+	exit 1
+}
+
+if [ $# -lt 3 ]; then
+	usage
+fi
+
+cpOrMv=$1
+sourcePath=$2
+sourceDir=$(echo $sourcePath | sed 's#\(.*/\).*#\1#g')
+if [ "$sourcePath" = "$sourceDir" ]; then
+	sourceDir=""
+fi
+sourceFile=$(echo $sourcePath | sed 's#.*/\(.*\)#\1#g')
+destDir=$3/$sourceDir
+fullSourcePath="`pwd`/$sourcePath"
+destFile=$destDir/$sourceFile
+
+#echo "SourceDir=$sourceDir"
+#echo "SourceFile=$sourceFile"
+#echo "SourcePath=$sourcePath"
+#echo "FullSourcePath=$fullSourcePath"
+#echo "DestDir=$destDir"
+#echo "DestFile=$destFile"
+#exit
+
+if [ -e $fullSourcePath ]; then
+	doNothing=""
+else
+	echo "Error: $fullSourcePath does not exist!"
+	usage
+fi
+
+cpOrMvVerb = "???"
+if [ "$cpOrMv" == "cp" ]; then
+	cpOrMvVerb = "Copying"
+elif [ "$cpOrMv" == "mv" ]; then
+	cpOrMvVerb = "Moving"
+else
+	echo "Error: Must be 'cp' or 'mv'"
+	usage
+fi
+
+echo "Creating $destDir ..."
+mkdir -p $destDir
+
+echo "$cpOrMvVerb $fullSourcePath to $destFile ..."
+$cpOrMv $fullSourcePath $destFile
+if [ $? = 0 ]; then
+	echo "Success!"
+	echo "ls -al $destFile"
+	ls -ald $destFile
+	exit 0
+else
+	echo "Error: $cpOrMvVerb was not successful!"
+	exit 1
+fi
+

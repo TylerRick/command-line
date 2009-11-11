@@ -1,0 +1,501 @@
+#!/bin/bash
+
+#------------------------------------------------
+function usage {
+  cat <<End
+grepfromuntil: Intuitively select regions of text that start or end with a certain pattern.
+
+Usage: 
+  grepfromuntil --from {expression}
+  grepfrom {expression}
+  grepto {expression}
+  ...
+
+  Same as grep, but adds these options:
+
+  --from-first / --from expression
+        [first match]
+        .   |   .
+        .   |   .
+        .  \|/  .
+        .       .
+
+        Designates a *top* boundary to a region.
+        Prints the *first* line matching expression and all *following*.
+        Use -B {lines} to also print {lines} lines of context *before* the first matching line.
+
+        These equivalent commands are provided as a convenience: grepfromfirst grepfrom
+
+  --to-first / --until / --to expression 
+        .       .
+        .  /|\  .
+        .   |   .
+        .   |   .
+        [first match]
+
+        Designates a *bottom* boundary to a region.
+        Prints the *first* line matching expression and all *preceeding*.
+        Use -A {lines} to also print {lines} lines of context *after* the first matching line.
+        Often followed by: grepbackto
+
+        These equivalent commands are provided as a convenience: grepto greptofirst grepuntil
+
+  --to-last / --back-from expression
+        .       .
+        .  /|\  .
+        .   |   .
+        .   |   . 
+        [last match]
+
+        Designates a *bottom* boundary to a region.
+        Prints the *last* line matching expression and all *preceeding*.
+        Use -B {lines} to also print {lines} lines of context *after* the first matching line. (It's -B instead of -A because the file is actually fed to grep in reverse, so just think of it in your head as if you're *starting* at the bottom of the file and going "forwards" in the up direction: so we're telling it to first "back up" and pick up an extra {lines} lines at the beginning {B}efore starting at the first line containing the match and proceeding all the way up to the top of the file.)
+
+        These equivalent commands are provided as a convenience: greptolast grepbackfrom
+
+  --from-last / --back-to / --back-until expression
+        [last match]
+        .   |   .
+        .   |   .
+        .  \|/  .
+        .       .
+
+        Designates a *top* boundary to a region.
+        Prints the *last* line matching expression and all *following*.
+        Use -A {lines} to also print {lines} lines of context *before* the first matching line. (It's -A instead of -B because the file is actually fed to grep in reverse, so just think of it in your head as if you're *starting* at the bottom of the file and going "forwards" in the up direction: so we're telling it to keep going up an extra {lines} lines *{A}fter* reaching the line containing the match.)
+
+        These equivalent commands are provided as a convenience: grepfromlast grepbackto
+
+  --skip / --skip-lines [{number_of_lines}]
+      Omit {number_of_lines} from the top (in the case of --from) (from the bottom in the case of --until) of the section that normally
+        would be displayed.
+      If omitted entirely, defaults to 0.
+      If you use --skip without giving it an optional number of lines, it will default to 1 line, meaning, "don't include the matching line,
+        just the lines *following* it (in the case of --from) (or *before* it in the case of --until).
+
+  --for / --for-lines [{number_of_lines}]
+      After the match, continue for {number_of_lines} lines afterwards and then stop.
+      Default is unlimited (well, actually 10000000).
+
+Examples:
+
+  Simple examples
+  ---------------
+
+  > echo -e "1\n2\n3\n4\n5"
+  1
+  2
+  3
+  4
+  5
+
+  > echo -e "1\n2\n3\n4\n5" | grepbackfrom 3
+  1
+  2
+  3
+
+  > echo -e "1\n2\n3\n4\n5" | grepbackto 3
+  3
+  4
+  5
+
+  When you expect to have multiple occurences
+  -------------------------------------------
+
+  # Be aware that, although similar, there is a difference between grepto and grepbackfrom.
+  # (grepto goes forward until it hits the *first* occurence; grepbackfrom goes forward until it hits the *last* occurence)
+  # Notice the difference:
+
+  > echo -e "1\n2\n3\n4\n3\n4\n5" | grepto 3
+  1
+  2
+  3
+
+  > echo -e "1\n2\n3\n4\n3\n4\n5" | grepbackfrom 3
+  1
+  2
+  3
+  4
+  3
+
+  # grepbackto and grepfrom are similarly related but different:
+
+  > echo -e "1\n2\n3\n4\n3\n4\n5" | grepbackto 3
+  3
+  4
+  5
+
+  > echo -e "1\n2\n3\n4\n3\n4\n5" | grepfrom 3
+  3
+  4
+  3
+  4
+  5
+
+  Combining a startpoint and an endpoint
+  --------------------------------------
+
+  # From '2' to '4'
+  > echo -e "1\n2\n3\n2\n3\n4\n5" | grepfrom 2 | grepuntil 4
+  2
+  3
+  2
+  3
+  4
+
+  (or: echo -e "1\n2\n3\n2\n3\n4\n5" | grepfrom 2 --until 4, but that doesn't work for all variations unfortunately)
+
+  # From '4' *back* to '2' (different results because we went back to the *last* 2 rather than forwards from the first 2):
+  > echo -e "1\n2\n3\n2\n3\n4\n5" | grepuntil 4 | grepbackto 2
+  2
+  3
+  4
+
+  > echo -e "1\n2\n3\n4\n3\n4\n5" | grepto 4 | grepbackto 2
+  2
+  3
+  4
+
+  > echo -e "1\n2\n3\n4\n3\n4\n5" | greptolast 4 | grepbackto 2
+  2
+  3
+  4
+  3
+  4
+
+  Context
+  -------
+
+  > echo -e "1\n2\n3\n4\n5" | grepfrom 3 -B1
+  2
+  3
+  4
+  5
+
+  > echo -e "1\n2\n3\n4\n5" | grepto 3 -A1
+  1
+  2
+  3
+  4
+
+  > echo -e "1\n2\n3\n4\n5" | grepbackfrom 3 -B1
+  1
+  2
+  3
+  4
+
+  > echo -e "1\n2\n3\n4\n5" | grepbackto 3 -A1
+  2
+  3
+  4
+  5
+
+  Extracting a specific function from a long source file/SCM
+  --------------------------------------------
+
+  # git-show HEAD~1:app/models/user.rb | grepfrom neato --for 30
+  def neato(options = {})
+    # ...
+  end
+  # ...
+
+  > git-show HEAD~1:app/models/user.rb | grepfrom neato --until end
+  def neato(options = {})
+    ... do
+      # ...
+    end
+
+  > git-show HEAD~1:app/models/user.rb | grepfrom neato --until '^  end'
+  def neato(options = {})
+    ... do
+      # ...
+    end
+  end
+
+  Backreferences are not yet supported or perhaps you could do neat things like this:
+  > git-show HEAD~1:app/models/user.rb | grepfrom '^(\s+)def neato --until '^\1end'
+
+  Log files
+  ---------
+
+  > echo -e "----------------\nDate: 2008-05-01\nError 500\n----------------\nDate: 2008-05-07\nError 400\nError 700\n----------------\nDate: 2008-05-10\nError 700" > file
+  > cat file
+  ----------------
+  Date: 2008-05-01
+  Error 500
+  ----------------
+  Date: 2008-05-07
+  Error 400
+  Error 700
+  ----------------
+  Date: 2008-05-10
+  Error 700
+
+  When was the *first* time an Error 700 occurred:
+
+  > cat file | grepuntil '^Error 700' | grepbackto '^Date: '
+  Date: 2008-05-07
+  Error 400
+  Error 700
+
+  When was the *last* time an Error 700 occurred:
+
+  > cat file | grepbackfrom '^Error 700' | grepbackto '^Date: '
+  Date: 2008-05-10
+  Error 700
+
+  If you want some context before or after either end of your match region you can always use the usual -A / -B / -C flags that grep offers...
+
+  > cat file | grepuntil '^Error 700' -A1 | grepbackto '^Date: ' -A1
+  ----------------
+  Date: 2008-05-07
+  Error 400
+  Error 700
+  ----------------
+
+  Rails log files
+  ---------------
+
+  When did the *first* "Too many connections" error occur?
+
+      > greptofirst 'Too many connections' /var/www/my_site/production/current/log/production.log -A10 | grepbackto 'Processing .* (for .* at .*)'
+      Processing WhateverController#show (for 91.37.184.234 at 2008-05-29 06:04:42) [GET]
+      ...
+      Too many connections
+      /usr/lib/ruby/gems/1.8/gems/activerecord-1.15.3/lib/active_record/connection_adapters/mysql_adapter.rb:389:in \`real_connect'
+      ...
+
+  What is the timestamp of the next request that was handled *after* the *last* "Too many connections" error?
+
+      > grepfromlast 'Too many connections' /var/www/my_site/production/current/log/production.log | grepuntil 'Processing .* (for .* at .*)'
+      Too many connections
+      ...
+      Session ID: 51f003d33d4ca9577e7b492158ab7057
+      Processing WhateverController#show (for 91.37.184.234 at 2008-05-29 06:04:42) [GET]
+
+
+  If a request generates a whole bunch of queries/output and only one bit is of interest to you, print a unique marker to the log file right before
+  the interesting part and then print the section that starts there and goes for 150 lines:
+      taillog log/test.log 500 | grepfrom 'The query:' --for 150
+
+  Database dumps
+  --------------
+
+  These examples assume MySQL. They might have been tested with 4.1.20 and are not guaranteed to work with your version of MySQL.
+
+  If you want to extract just the *structure* (CREATE statement) for the single table "table_name" from a database dump that contains dumps of many different tables, then you might do something like this:
+
+      $ grepfrom "^CREATE TABLE \`table_name\`" db_dump_with_many_tables.sql | grepuntil '^-- Dumping data'"
+      CREATE TABLE \`table_name\` (
+        ...
+      ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+      --
+      -- Dumping data for table \`table_name\`
+
+  or even better:
+
+      $ grepfrom "^CREATE TABLE \`table_name\`" db_dump_with_many_tables.sql --until '^)'
+      CREATE TABLE \`table_name\` (
+        ...
+      ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+  If you want to extract just the *data* (INSERT statements) for table "table_name", then you could do something like this:
+
+      # Go until "^UNLOCK TABLES" and then go 1 line more (after) (-A)...
+      $ grepfrom "^LOCK TABLES" out.sql | grepuntil "^UNLOCK TABLES" -A 1
+
+  If you want to extract both the structure (CREATE statement) *and* the data (INSERT statements) for table "table_name", then you could do something like this:
+
+      $ grepfrom "^CREATE TABLE \`table_name\`" db_dump_with_many_tables.sql | grepuntil "^UNLOCK TABLES" -A 1
+
+  If you want to extract a create statement for a specific table from a db/schema.rb file:
+  (This example taken from Spree source code)
+
+      > cat db/schema.rb | grepfrom credit --until end
+      create_table "creditcard_payments", :force => true do |t|
+        t.integer  "order_id"
+        t.string   "number"
+        t.string   "cc_type"
+        t.string   "month"
+        t.string   "year"
+        t.string   "display_number"
+        t.string   "first_name"
+        t.string   "last_name"
+        t.datetime "created_at"
+        t.datetime "updated_at"
+      end
+
+  DNS lookups
+  -----------
+
+  What is the A record of svn.tylerrick.com ? 
+    > dig a svn.tylerrick.com | grepfrom 'ANSWER SECTION:' | head -n 2
+    ;; ANSWER SECTION:
+    svn.tylerrick.com.  14231 IN  A 208.113.153.42
+
+  Or if you just want the actual line containing the answer...
+
+  > dig a svn.tylerrick.com | grepfrom 'ANSWER SECTION:' --skip 1 --for 1
+  svn.tylerrick.com.  14400 IN  A 208.113.153.42
+End
+}
+
+#------------------------------------------------
+if [ $# -eq 0 ]; then
+  usage
+  exit 1
+fi
+
+
+#------------------------------------------------
+# Options
+
+#echo $@
+#TEMP=`getopt -o 9 --long from:,until: -n $0 -- "$@"`
+# man grep | grep '^ *-'
+TEMP=`getopt -o A:,a,B:,C:,b,c,D:,d:,E,e:,F,P,f:,G,H,h,I,i,L,l,m:,n,o,q,R,r,s,U,u,V,v,w,x,y,Z \
+  --long from:,from-first:,to-first:,until:,to:,to-list:,back-from:,from-last:,back-to:,back-until:,skip:,skip-lines:,for:,lines:,for-lines:,after-context:,text,before-context:,context:,byte-offset,binary-files:,color::,colour::,count,devices:,directories:,extended-regexp,regexp:,fixed-strings,perl-regexp,file:,basic-regexp,with-filename,no-filename,help,ignore-case,files-without-match,files-with-matches,max-count:,line-number,only-matching,label:,line-buffered,quiet,silent,recursive,include:,exclude:,no-messages,binary,unix-byte-offsets,version,invert-match,word-regexp,line-regexp,null \
+  -n $0 -- "$@"`
+
+if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+eval set -- "$TEMP"
+#echo $@
+
+preserved=( )
+i=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --from-first|--from) 
+      from_first=$2
+      shift 2
+      ;;
+
+    --to-first|--until|--to) 
+      to_first=$2
+      shift 2
+      ;;
+
+    --to-last|--back-from) 
+      to_last=$2
+      shift 2
+      ;;
+
+    --from-last|--back-to|--back-until) 
+      from_last=$2
+      shift 2
+      ;;
+
+    --skip|--skip-lines)
+      skip_lines=$2
+      shift 2
+      ;;
+
+    --lines|--for-lines|--for)
+      for_lines=$2
+      shift 2
+      ;;
+
+    --) 
+      # No more options after this point -- only "plain args"
+      plain_args_start_at=`expr $i + 1`
+      preserved[$i]=$1
+      shift ; 
+      #break ;;
+      ;;
+
+    --help)
+      usage
+      exit 1
+      ;;
+
+    *) 
+      #echo "Error while parsing options!" ; exit 1 ;;
+      preserved[$i]=$1
+      #echo ${preserved[$i]}
+      shift ;;
+  esac
+  let "i += 1"
+done
+
+t=${skip_lines:=0}
+t=${for_lines:=10000000}
+
+#------------------------------------------------
+# Fix it so that this:
+# > grepfrom "CREATE TABLE" out.sql --until "UNLOCK" -A 1
+# gives us this for $@ (preserves -A 1):
+# -A 1 -- out.sql
+# instead of this (because everything was shifted out):
+# 1 -- out.sql
+
+#echo "${preserved[@]}"
+eval set -- "${preserved[@]}"
+#echo $@
+
+
+
+#------------------------------------------------
+# To do: Seems like we ought to be able to use recursion to collapse the number of cases and get rid of this one...
+if [ -n "$from_first" -a -n "$to_first" ]; then
+#  echo ,"$from_first",
+#  echo ,"$to_first",
+  if file $( readlink /proc/$$/fd/0 ) | grep -q "character special"; then
+    # Standard input (hopefully they specified a file name so that it doesn't just sit there and wait for input!)
+    #command="grep -A10000000 ${@} -e \"$from_first\" | grep -B10000000 --max-count=1 \"$to_first\""
+    #echo $command
+    exec grep -A10000000 -e "$from_first" "$@" | grep -B10000000 --max-count=1 -e "$to_first"
+  else
+    # Pipe or File input
+    exec cat - | grep -A10000000 -e "$from_first" "$@" | grep -B10000000 --max-count=1 -e "$to_first"
+  fi
+
+#------------------------------------------------
+elif [ -n "$from_first" ]; then
+  if file $( readlink /proc/$$/fd/0 ) | grep -q "character special"; then
+    exec grep -A10000000 -e "$from_first" "$@" | skiplines $skip_lines | head -n $for_lines
+    # Can't use --max-count=1 or it will stop if it hits a second occurence. We want it to go all the way to the end...
+
+  else
+    #echo "cat - | grep -A10000000 -e \"$from_first\" \"$@\""
+    #exec cat - | grep -A10000000 -e "$from_first" "$@"
+    exec cat - | grep -A10000000 -e "$from_first" "$@" | skiplines $skip_lines | head -n $for_lines
+  fi
+
+#------------------------------------------------
+elif [ -n "$to_first" ]; then
+  #echo $to_first, "$@"
+  if file $( readlink /proc/$$/fd/0 ) | grep -q "character special"; then
+    exec grep -B10000000 --max-count=1 -e "$to_first" "$@" | skiplines $skip_lines | head -n $for_lines
+    # --max-count=1 tells it to stop going further when it hits the first one, and the -B10000000 tells it to show all lines previous...
+  else
+    exec cat - | grep -B10000000 --max-count=1 -e "$to_first" "$@" | skiplines $skip_lines | head -n $for_lines
+  fi
+
+#------------------------------------------------
+elif [ -n "$to_last" ]; then
+  if file $( readlink /proc/$$/fd/0 ) | grep -q "character special"; then
+    filename=${preserved[$plain_args_start_at]}
+    shift 2
+    exec tac $filename | grepfromfirst "$to_last" "$@" | tac
+  else
+    exec tac - | grepfromfirst "$to_last" "$@" | tac
+  fi
+
+#------------------------------------------------
+elif [ -n "$from_last" ]; then
+  if file $( readlink /proc/$$/fd/0 ) | grep -q "character special"; then
+    filename=${preserved[$plain_args_start_at]}
+    shift 2   # Important! If we don't do this, then "$@" will be -- filename and so filename will get passed on to grepto, which will pass it on to grep, which will cause grep to use *filename* as its input rather than the input we're piping into it (which is reversed), causing all sorts of weird bugginess...
+    exec tac $filename | greptofirst "$from_last" "$@" | tac
+  else
+    exec tac - | greptofirst "$from_last" "$@" | tac
+  fi
+
+#------------------------------------------------
+else
+  # Trivial pass-through
+  exec grep "$@"
+fi
+
+
+

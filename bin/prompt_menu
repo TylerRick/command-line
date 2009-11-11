@@ -1,0 +1,111 @@
+#!/usr/bin/ruby
+
+#---------------------------------------------------------------------------------------------------
+def usage
+  puts "Usage: #{File.basename($0)}"
+  puts <<End
+Gives you a meny for modifying your PS1 prompt.
+End
+  exit 1
+end
+
+#-------------------------------------------------------------------------------
+# To do:
+
+
+#-------------------------------------------------------------------------------
+require 'rubygems' 
+require 'facets'
+require 'colored'
+require 'pathname'
+require 'facets/blank'
+
+#require File.dirname(__FILE__) + '/../lib/getch'
+#require File.dirname(__FILE__) + '/../lib/menu'
+require ENV['HOME'] + "/dev/git/tyler-git/" + 'lib/getch'
+require ENV['HOME'] + "/dev/git/tyler-git/" + 'lib/menu'
+
+require 'quality_extensions/string/with_knowledge_of_color'
+
+#---------------------------------------------------------------------------------------------------
+require 'getoptlong'
+
+
+#---------------------------------------------------------------------------------------------------
+
+def menu
+  response = nil
+  selected_branch = nil
+  show_menu = true
+
+  catch :repeat do
+    show_list = @show_list if !@show_list.nil?
+    show_menu = @show_menu if !@show_menu.nil?
+    @show_list = nil
+    @show_menu = nil
+
+    # TODO: fix this
+    #puts ENV['PS1']
+    system("echo -e $PS1")
+
+    #-------------------------------------------------------------------------------------
+    if show_menu
+      print(
+        "[x] " + "1) current time".menu_item(:green) + ''                                         + "\n" +
+        "[x] " + "2) user@hostname".menu_item(:green) + ''                                         + "\n" +
+        "[x] " + "3) current working directory".menu_item(:green) + ''                             + "\n" +
+        "[x] " + "4) git branch".menu_item(:green) + ''                                         + "\n" +
+        "    " + "d) disable everything / minimal prompt (for demos/documentation)".menu_item(:green) + ''                                         + "\n" +
+        "> ".cyan
+      )
+    else
+      show_menu = true
+    end
+
+    #-------------------------------------------------------------------------------------
+    response = STDIN.getch
+    show_list = true
+    case response
+      when '?'
+        puts
+        throw :repeat
+
+      when '1'
+        return :time
+      when '2'
+        return :user_and_host
+
+      when 'q', 'Q'
+        return :quit
+
+      else
+        # Invalid option. Do nothing.
+        puts
+        throw :repeat
+
+    end # case response
+  end
+
+  response
+end
+
+
+#---------------------------------------------------------------------------------------------------
+show_list = true
+loop do
+  response = menu
+  puts
+
+  case response
+    when :time
+      puts 'time'
+
+    when :quit
+      exit 0
+
+  end # case response
+
+end
+
+
+#---------------------------------------------------------------------------------------------------

@@ -1,0 +1,5 @@
+# TODO: let you pipe a not-found error into inst and it will extract the "You can install it by..." line and execute it.
+echo "sudo apt-get install" "$@"
+sudo apt-get install "$@"
+# TODO: after installing, list files in package / files added, especially list if there are any new man pages or documentation to get you started
+

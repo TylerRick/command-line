@@ -1,0 +1,24 @@
+#!/bin/bash
+# This is like cgrep but also excludes states and vehicles directories
+
+if [ $# -lt 1 ]; then
+	echo "Usage: `basename $0` searchTerm [directory] [grepOptions] [findOptions]"
+	exit 1
+fi
+
+# This block is duplicated between cgrep, cfgrep, and vimgrep. If you change
+# something in one place, you should probably change it in all.
+searchTerm=${1}
+directory=${2:-"./"}
+grepOptions=${3:-""}
+findOptions=${4}
+#echo searchTerm=$searchTerm
+#echo directory=$directory
+#echo grepOptions=$grepOptions
+#echo findOptions=$findOptions
+#echo "-------------------------"
+
+if [[ $HOSTNAME == "tyler" ]]; then
+  # vendor/rails/railties/doc/guides/source/benchmarking_and_profiling/examples/graph.html:45837:
+  cgrep "$searchTerm" "$directory" "$grepOptions" "$findOptions ( -type d -name doc -prune ) -o  ( -type d -name rdoc -prune ) -o  ( -type d -name FCKeditor -prune ) -o ( -type d -name sessions -prune ) -o ( -type d -name simpletest -prune ) -o ( -type d -name graph.html -prune ) -o ( -type d -name rdoc -prune ) -o ( -type d -name data -prune ) -o ( -type f -name *.schema -prune ) -o ( -type f -name *dump*.sql -prune ) -o ( -type f -name *.log* -prune ) -o ( -type f -name '*.sqldump' -prune ) -o ( -type f -name Migration02.sqldump -prune ) -o "
+fi

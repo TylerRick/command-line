@@ -1,0 +1,13 @@
+#!/bin/bash
+
+now=`date +%Y%m%dT%H%M`
+sudo mkdir -p /etc/X11/$now
+sudo cp -a /etc/X11/xorg.conf /etc/X11/$now/
+sudo cp -a /var/log/Xorg.0.log* /etc/X11/$now/
+
+sudo ls -ld /etc/X11/$now/
+sudo ls -l /etc/X11/$now/
+
+#if [[ "$1" == "" ]]; then
+#	exit 1
+#fi

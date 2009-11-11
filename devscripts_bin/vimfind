@@ -1,0 +1,3 @@
+#!/bin/bash
+# Opens in vim all the files whose filename contains $1.
+vim `ffind $1 $2` 

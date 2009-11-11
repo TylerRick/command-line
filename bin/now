@@ -1,0 +1,21 @@
+#!/bin/sh
+if [ "$2" = 'human' ]; then
+  if [ "$1" = 's' ]; then
+    date '+%Y-%m-%d %H:%M:%S'
+  else
+    date '+%Y-%m-%d %H:%M'
+  fi
+elif [ "$2" = 'long' ]; then
+  if [ "$1" = 's' ]; then
+    date +%Y-%m-%d_%H:%M:%S
+  else
+    date +%Y-%m-%d_%H:%M
+  fi
+else
+  if [ "$1" = 's' ]; then
+    date +%Y%m%dT%H%M%S
+  else
+    date +%Y%m%dT%H%M
+  fi
+fi
+

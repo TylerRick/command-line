@@ -1,0 +1,6 @@
+#!/bin/sh
+# diff bad/script/server cool/script/server
+# rcp  bad/script/server cool/script/server
+
+# could also call it pc, since rcp is a standard program alread (but never used by me since I use scp)
+cp $2 $1

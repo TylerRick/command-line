@@ -1,0 +1,12 @@
+#! /usr/bin/env python
+# Given the path of a python file as its input, this will exit with 0 if it's valid and 1 if it's invalid (has parse errors)
+import sys, os, compiler
+fileName = sys.argv[1]
+print "Checking " + fileName
+
+try:
+	compiler.parseFile(fileName)
+except SyntaxError:
+	sys.exit(1)	# 1 means it's not valid
+else:
+	sys.exit(0)	# 0 means it's valid

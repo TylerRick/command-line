@@ -3,18 +3,46 @@ require 'rubygems'
 require 'quality_extensions/pathname'
 require 'facets'
 
+# To do:
+# * refactor to class
+# * op = :mv or :cp (create cptodir command)
+
 # TODO: getopt
 @verbose = true
 
 if ARGV.size < 2
   puts <<End
-Usage: mvtodir <files...> <dir>
+Usage: mvtodir [options] <files...> <dir>
 
 <dir> need not already exist; it will be created it if does not.
 
 This is better than simply doing mkdir <dir>; mv <files...> <dir>, because that will try to move <dir> to itself.
-mvtodir will detect if you accidentally give the dest dir as one of the sources and will skip that, moving all other files, which is probably what you wanted...
+mvtodir will detect if you accidentally give the dest dir as one of the sources (which will happen whenever you supply * for <files>) and will skip that, moving all other files, which is probably what you wanted...
 (Besides, mvtodir is less to type).
+
+Similar to this option from mv:
+       -t, --target-directory=DIRECTORY
+                     move all SOURCE arguments into DIRECTORY
+
+
+Options:
+--on-conflict=<arg>, where <arg> can be overwrite, ask, copy-to-subdir, or add-suffix
+
+--create-subdir=<arg>, where <arg> can be all or on-conflict (default)
+
+  mvtodir --create-subdir=all ./neat_file backups
+  => backups/20090111T1329/neat_file
+  mvtodir --create-subdir ./neat_file backups
+  => backups/20090111T1400/neat_file
+  ??
+
+--create-subdir-style=<arg>, where <arg> can be 
+  'now' (default): creates a subdirectory with the name taken from the 'now' command (the format of which can be configured with a ~/.now file?)
+  ...
+
+
+--verbose
+--silent
 End
   exit 1
 end
@@ -38,7 +66,11 @@ if !dest.exist?
 end
 sources.each do |source|
   #puts "Moving #{source} to #{dest}..."
-  source.mv dest, :verbose => @verbose
+  begin
+    source.mv dest, :verbose => @verbose
+  rescue Errno::EEXIST
+    STDERR.puts "File appears to already exist in dest dir (#{$!.inspect})"
+  end
 end
 
 #system %(mkdir -p #{ARGV[-1]})

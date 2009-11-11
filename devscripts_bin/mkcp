@@ -1,0 +1,19 @@
+#!/bin/bash
+
+function usage() {
+	echo "------------------------------------"
+	echo "mkcp  --  mkdir + cp"
+	echo "Usage:"
+	echo "		mkcp sourcePath destDir"
+	echo "Copies sourcePath to destDir/fileToMove. (Same as cp, except it creates destDir if it doesn't exist.)"
+	echo "Note: sourcePath is *relative* te \`pwd\`. (It will give an error if you try to give an absolute path.)"
+	echo "Example:"
+	echo "		cpmk 89glass/lib/class/Order.class.php ~/svn/project_graveyard/"
+	exit 1
+}
+
+if [ $# -lt 2 ]; then
+	usage
+fi
+
+mkdirMvOrCp cp $1 $2

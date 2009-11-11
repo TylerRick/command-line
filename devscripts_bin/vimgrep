@@ -1,0 +1,11 @@
+#!/bin/bash
+# Opens in vim all the files that contain the search expression $1.
+
+# This block is duplicated between cgrep, cfgrep, and vimgrep. If you change
+# something in one place, you should probably change it in all.
+searchTerm=${1}
+directory=${2:-"./"}
+grepOptions=${3:-""}
+findOptions=${4}
+
+exec cfgrep "$searchTerm" "$directory" "$grepOptions" | vimopen "$searchTerm"

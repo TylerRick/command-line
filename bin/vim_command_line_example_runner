@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+# vim filter command (see help filter)
 
 require 'rubygems'
 require 'quality_extensions/string/prefix_lines'

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Make sure we're in the right directory
+ls=`ls devscripts_bin 2> /dev/null`
+if [ "$?" == "1" ]; then echo "Not in the right directory"; exit 1; fi;
+ls=`ls script 2> /dev/null`
+if [ "$?" == "1" ]; then echo "Not in the right directory"; exit 1; fi;
+
+svn export --force http://svn/svn/devscripts/bin ./devscripts_bin
+rm ./devscripts_bin/create_pgpass
+svn status 
+
+
+# Problem: what if there are files in repo A that aren't in repo B? look for ? files. we need to svn add them...
+# What if a file has been removed in A? keep a list of files that svn export outputs. subtract that from the list of files in B. the remainder are the files that should (maybe) be svn rm'ed from B.

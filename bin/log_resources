@@ -1,0 +1,61 @@
+#!/bin/bash
+# To change dir, execute with:
+#   env log_resources_dir=~/logs/resources log_resources
+# Question:
+# * How to organize?
+#   * file: logs/resources/#{log_type}
+#     contents: entries from multiple timestamps
+#     entry: #{timestamp}#{body}
+#   * file: logs/resources/#{log_type}/#{timestamp}
+#     contents: #{body}
+#   * file: logs/resources/#{timestamp}/#{log_type}
+#     contents: #{body}
+#   * file: logs/resources/#{timestamp}
+#     contents: entries from multiple sources
+#     entry: #{body}
+
+log_resources_dir=${log_resources_dir:-~/logs/resources}
+
+if test ! ${log_resources_dir}; then
+    echo "Please set \${log_resources_dir}"
+    exit 1
+fi
+#echo ${log_resources_dir}
+
+function header() {
+    local file
+    file=$1
+    echo "----------------------------------------------------------------------------------------------------" >> $file
+    echo "$now: " >> $file
+}
+
+mkdir -p ${log_resources_dir}
+now=`date +%Y%m%dT%H%M`
+#export TERM=linux      # may be needed to trick top to display nicely?
+
+file=${log_resources_dir}/df
+header $file
+df >> $file
+
+file=${log_resources_dir}/uptime
+header $file
+uptime >> $file
+
+file=${log_resources_dir}/pstree
+header $file
+pstree >> $file
+
+file=${log_resources_dir}/ps
+header $file
+ps aux >> $file
+
+file=${log_resources_dir}/free
+header $file
+free -m -o >> $file
+
+file=${log_resources_dir}/top
+header $file
+top -b -n1 | head -n 25 >> $file
+#top -b -n1 | head -n 17 | sed 's/\[H//g'  | sed 's/\[6;1H//g' >> $file
+                       # /\ removes the codes which position the cursor at the top of screen
+

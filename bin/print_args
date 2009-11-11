@@ -1,0 +1,21 @@
+#!/bin/bash
+# :!% "two words" arg3
+
+echo "There are $# args:"
+
+# Variable variable names using eval!:
+#for i in $(seq 1 $#); do
+#    echo "\$$i=`eval echo \\$\$i`"
+#    let i+=1
+#done
+
+i=1
+for arg_value in "$@"; do
+    echo "\$$i=$arg_value"
+    let i+=1
+done
+
+# The old way (without a for loop):
+#echo "\$1=$1"	# outputs: $1=a b
+#echo "\$2=$2"
+

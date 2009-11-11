@@ -1,0 +1,4 @@
+source script/config
+# Pull:                ->
+# Push:                <-
+dir_diff $external_dir    $local_dir

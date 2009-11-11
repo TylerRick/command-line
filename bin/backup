@@ -1,0 +1,360 @@
+#!/bin/bash
+
+# To do:
+# make it so either this command or another gives you a nicer alternative to the very common cp operation of copying to the same location + a suffix
+# cp /boot/grub/menu.lst /boot/grub/menu.lst.tyler20090128
+# backup_with_suffix /boot/grub/menu.lst .tyler20090128 ?
+
+function usage {
+  cat - <<End
+backup  --  Makes a backup copy of a file
+Usage: 
+  backup [options] file_list
+  backup [options] dir
+
+  Each file in file_list is split into {dir}, {file} components which are then used in "target 
+  patterns" to construct target path/filename (see below).
+
+Options:
+  --detect
+    Tries to infer your desired backup location/pattern by looking for the presence of existing 'backups' subdirectories and such...
+
+  --target pattern / --pattern pattern / -p pattern
+    Force your desired "target pattern"
+
+  --date-suffix date_suffix
+    Overrides default, which is:
+      "`date +%Y%m%dT%H%M`"
+      "-backup-`date +%Y%m%dT%H%M`" (for single-file backups)
+
+  --prefix prefix
+    Default: (none)
+    Could be . (to make backup files hidden)
+
+  --suffix-before-extension / --suffix-after-extension / --duplicate-extension
+    (default is after?)
+    
+    --suffix-after-extension:
+      Benefits:
+        [Homogenous by basename]
+        Directory listing looks nicer:
+          profiles.ini
+          profiles.ini-backup-20080527T1628
+        Auto-completion will jump all the way up to 'profiles.ini'
+      Drawbacks:
+        It might appear that the "extension" (and therefore the file type, depending on what/who you ask) has changed.
+
+    --suffix-before-extension:
+      Benefits:
+        [Homogenous by extension]
+        When sorting by "extension" (for instance, in Nautilus), it will appear more natural.
+      Drawbacks:
+        Auto-completion will pause and make you choose between .ini and -backup, even though most of the time you would want .ini
+          profiles.ini
+          profiles-backup-20080527T1628.ini
+
+    --duplicate-extension:
+      Puts "suffix" in the middle.
+      Puts extension right after basename, so that auto-completion stays nice.
+      Puts extension at end too, so that "extension"-based activities stay nice.
+
+  --no-identical-backups
+    Check if previous backup exists and is identical to new backup; if so, delete new backup (or create symlink??)
+
+  --include-backups-dir
+    If A/backups/ exists and you back up A, then A/backups will be copied into the target backup dir
+  --no-include-backups-dir
+    If A/backups/ exists and you back up A, then A/backups will NOT be copied into the target backup dir
+
+  --collapse-nested-backups / --delete-nested-backups / --clean-up-nested-backups
+    if you have
+      A
+      \- B
+         \- backups
+      \- C
+         \- backups
+      \- backups
+    and you back up A, then A/**/backups will get deleted *after* making a backup that includes those (mini-/sub-/nested-)backups
+
+  --cp-options
+    Default is -r -p
+
+Default behavior: --detect --date-as-suffix-for-single-files:
+  If backups/ exists, use it
+
+  Backing up single files:
+    backups/{dir}/{file}{date_suffix}           (due to --date-as-suffix)
+    {dir}/backups/{file}{date_suffix}           (due to --date-as-suffix)
+    {dir}/{file}-backup-{date}
+
+    When {dir} is nothing (./), this collapses to this simpler case:
+    backups/{file}{date_suffix}           (due to --date-as-suffix)
+    backups/{file}{date_suffix}           (due to --date-as-suffix)
+    {file}-backup-{date}
+
+  Backing up multiple files / entire directories:
+    backups/{dir}/{file}{date_suffix}           (due to --date-as-suffix)
+    {dir}/backups/{file}{date_suffix}           (due to --date-as-suffix)
+    {dir}/{file}-backup-{date}
+
+    When {dir} is nothing (./), this collapses to this simpler case:
+    backups/{file}{date_suffix}           (due to --date-as-suffix)
+    backups/{file}{date_suffix}           (due to --date-as-suffix)
+    {file}-backup-{date}
+
+Examples:
+
+  tyler: ~/.mozilla-thunderbird/ >
+  > backup profiles.ini -v
+  Doing a single-file backup...
+  Considering target 'backups/profiles.ini/20080527T1727/profiles.ini'...
+  Considering target 'backups//profiles.ini-backup-20080527T1727'...
+  About to copy:    cp -r -p "profiles.ini" "backups/profiles.ini-backup-20080527T1727"
+  ================> 'backups/profiles.ini-backup-20080527T1727'
+
+  tyler: ~/.mozilla-thunderbird/Tyler >
+  > backup extensions -v
+  Doing a single-file backup...
+  Considering target 'backups/extensions'...
+  Considering target 'backups/extensions-backup-20080527T1720'...
+  Considering target '' and filename 'extensions-backup-20080527T1720'...
+  About to copy:    cp -r -p "extensions" "extensions-backup-20080527T1720"
+  ================> 'extensions-backup-20080527T1720'
+
+  tyler: ~/.mozilla-thunderbird/ >
+  > backup 'Tyler' --pattern "backups/{dir}/{file}{suffix}" -v
+  Doing a single-file backup...
+  Considering target 'backups/Tyler'...
+  Considering target 'backups/Tyler-backup-20080527T1712'...
+  About to copy:    cp -r -p "Tyler" "backups/Tyler-backup-20080527T1712"
+  ================> 'backups/Tyler-backup-20080527T1712'
+
+  > backup 'Tyler/Mail/Local Folders/msgFilterRules.dat' -v
+  Doing a single-file backup...
+  Considering target 'backups/Tyler/Mail/Local Folders/msgFilterRules.dat'...
+  Considering target 'backups/Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1708'...
+  Considering target 'Tyler/Mail/Local Folders/' and filename 'msgFilterRules.dat-backup-20080527T1708'...
+  About to copy:    cp -r -p "Tyler/Mail/Local Folders/msgFilterRules.dat" "Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1708"
+  ================> 'Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1708'
+  # Hey, that's not where we wanted it!
+
+  > backup 'Tyler/Mail/Local Folders/msgFilterRules.dat' --pattern "backups/{dir}/{file}{suffix}" -v
+  Doing a single-file backup...
+  Considering target 'backups/Tyler/Mail/Local Folders/msgFilterRules.dat'...
+  Considering target 'backups/Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1709'...
+  Created directory 'backups/Tyler/Mail/Local Folders/'
+  About to copy:    cp -r -p "Tyler/Mail/Local Folders/msgFilterRules.dat" "backups/Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1709"
+  ================> 'backups/Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1709'
+
+  # No need to specify pattern the second time... it will detect that 'backups/Tyler/Mail/Local Folders/' exists and use it...
+  > backup 'Tyler/Mail/Local Folders/msgFilterRules.dat' -v
+  Doing a single-file backup...
+  Considering target 'backups/Tyler/Mail/Local Folders/msgFilterRules.dat/20080527T1733/msgFilterRules.dat'...
+  Considering target 'backups/Tyler/Mail/Local Folders//msgFilterRules.dat-backup-20080527T1733'...
+  About to copy:    cp -r -p "Tyler/Mail/Local Folders/msgFilterRules.dat" "backups/Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1733"
+  ================> 'backups/Tyler/Mail/Local Folders/msgFilterRules.dat-backup-20080527T1733'
+
+  ~/.gnupg >
+  > backup . -v
+  Doing a single-file backup...
+  Considering target 'backups/./20080703T1607/.'...
+  Created directory 'backups/./20080703T1607/'
+  . is a directory
+  Ignoring backups dir
+  gpg-agent-info-tyler-desktop gpg.conf .gpg.conf.swp private-keys-v1.d pubring.gpg pubring.gpg~ pubring.kbx random_seed secring.gpg trustdb.gpg
+  About to copy:    cp -a * "backups/./20080703T1607/."
+  ================> 'backups/./20080703T1607/.'
+
+
+To do:
+  Rewrite in Ruby
+  Clean up majorly
+  Unit tests
+  Let you have a .backups config file in any directory, similar to a Makefile, which specifies backup preference/behavior for the current dir and its entire tree (unless subdirectories override).
+    Have your *default* config in ~/.backups, falling back to /usr/lib/backups.conf or something
+    You could specify, for example, that your backup directory is *outside* of current tree (./), in a parallel tree: ../backups
+    You could specify patterns, to put backups of different files/types of files/directories into different folders/subfolders. For example *.sql files go into backups/db.
+    List preferred pattern, in order of preference: (too confusing? only have one preferred pattern?)
+      backups/{dir}/{file}
+  Or choose between 
+    --date-first
+      'backups/20080527T1434/Tyler/Mail/Local Folders'
+      (good if there are a lot of files/folders you're backup up at this time, a lot of stuff going into backups/20080527T1434/)
+    --date-last/--dir-first
+      'backups/Tyler/Mail/Local Folders/20080527T1434'
+      (good if all you want to do is back up a single file or a couple files)
+  Or *require* user to specify pattern unless --detect is passed?
+  Should I call it $dir or $path?
+  Specify precision of timestamp (up to the day, hour, min, or sec)
+
+To do (blah):
+  Let you pass --backups-dir-file-date or similar to specify/force pattern. If you do that, don't complain when target directory doesn't exist; *create* it!
+
+  ''
+End
+	exit 1
+}
+
+TEMP=`getopt \
+     -o     v,d,t \
+     --long verbose,detect,date-format:,target:,pattern:,cp-options:,include-backups-dir,no-include-backups-dir \
+     -n "$0" -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+eval set -- "$TEMP"
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-v|--verbose) 
+      verbose=1
+      shift
+      ;;
+		-d|--detect) 
+      detect=1
+      shift
+      ;;
+		-p|--target|--pattern) 
+      pattern=$2
+      shift 2
+      ;;
+		--cp-options)
+      cp_options=$2
+      shift 2
+      ;;
+		--date-format)
+      date_format=$2
+      shift 2
+      ;;
+
+		--include-backups-dir)
+      include_backups_dir=1
+      shift
+      ;;
+		--no-include-backups-dir)
+      unset include_backups_dir
+      shift
+      ;;
+
+		--)
+      shift
+      break
+      ;;
+		*) 
+      echo "Error while parsing options: unexepected option '$1' -- getopt should have moved it to the end, *after* the --"
+      exit 1
+      ;;
+	esac
+done
+
+if [ $# -lt 1 ]; then
+  usage
+fi
+
+
+#---------------------------------------------------------------------------------------------------
+# Options
+
+# to do: parse options
+
+: ${verbose:=}
+date_as=suffix # dir
+: ${date_format:=+%Y%m%dT%H%M}
+date=`date $date_format`
+: ${single_file_date_suffix:="-backup-$date"}
+: ${pattern:=}
+: ${cp_options:=-a}  #-r -p
+: ${include_backups_dir:=}
+
+#---------------------------------------------------------------------------------------------------
+if [ $# -gt 1000 ]; then    # to do: after parsing off options, see if we have a list of >1 individual files
+  backup_type=multi-file
+  suffix=""
+else
+  backup_type=single-file
+  suffix=$single_file_date_suffix
+fi
+
+source=$1
+dir=`dirname  "$source"`/        # Must have trailing / if non-empty because $dir may be empty, in which case we don't want to do /$dir/ and end up with //
+# To do: Re-write in Ruby. Then we can use File.join() and not care if path parts have trailing /'s or not!
+if [ "$dir" = "./" ]; then
+  dir=""
+fi
+
+file=`basename "$source"`
+
+#---------------------------------------------------------------------------------------------------
+
+if [ "$backup_type" = "single-file" ]; then
+  if [ -n "$verbose" ]; then echo "Doing a single-file backup..."; fi
+
+  if [ -z "$target_dir" ]; then # Haven't set it yet
+    if [ -n "$verbose" ]; then echo "Considering target 'backups/${dir}$file/$date/$file'..."; fi
+    if [ -d "backups/${dir}$file" ]; then
+      target_dir="backups/${dir}$file/$date/"
+    fi
+  fi
+
+  if [ -z "$target_dir" ]; then # Haven't set it yet
+    if [ -n "$verbose" ]; then echo "Considering target 'backups/$dir/${file}${suffix}'..."; fi
+    if [ -d "backups/$dir" -o "$pattern" = "backups/{dir}/{file}{suffix}" ]; then
+      target_dir="backups/$dir"
+      target_file="${file}${suffix}"
+    fi
+  fi
+
+  if [ -z "$target_dir" ]; then # Haven't set it yet
+    if [ -n "$verbose" ]; then echo "Considering target '$dir/${file}${suffix}'..."; fi
+    target_dir="$dir"
+    target_file="${file}${suffix}"
+  fi
+
+else
+
+  if [ -z "$target_dir" ]; then # Haven't set it yet
+    if [ -n "$verbose" ]; then echo "Considering target 'backups/$dir$date/$file'..."; fi
+    if [ -d "backups/$dir" ]; then
+      target_dir="backups/$dir$date/"
+    fi
+  fi
+
+  if [ -z "$target_dir" ]; then # Haven't set it yet
+    if [ -n "$verbose" ]; then echo "Considering target 'backups/$date/$dir/$file'..."; fi
+    target_dir="backups/$date/$dir"
+  fi
+fi
+
+#---------------------------------------------------------------------------------------------------
+# Create target *directory*
+if [ -n "$target_dir" -a ! -d "$target_dir" ]; then
+  mkdir -p "$target_dir"
+  if [ -n "$verbose" ]; then echo "Created directory '$target_dir'"; fi
+fi
+
+#---------------------------------------------------------------------------------------------------
+
+target="${target_dir}${target_file:-$file}"
+
+#---------------------------------------------------------------------------------------------------
+
+if [ -d "$source" ]; then
+  echo "$source is a directory"
+  if [ -n $include_backups_dir ]; then
+    echo "Ignoring backups dir"
+    # Note: GLOBIGNORE=* didn't work. Even though semantically equivalent (in this example), GLOBIGNORE=* doesn't seem to cause ./backups to be ignored when using ./* as the glob; so we have to use GLOBIGNORE=./* instead.
+    export GLOBIGNORE=$source/backups
+    source=$source/*
+    echo "These files will be copied:"
+    echo $source
+  fi
+fi
+
+if [ -n "$verbose" ]; then echo "About to copy:    cp $cp_options $source \"$target\""; fi
+
+mkdir "$target"
+cp $cp_options $source "$target"
+if [ $? = 0 ]; then
+  echo "================> '$target'"
+else
+  echo "Error while copying to: '$target'"
+fi
+

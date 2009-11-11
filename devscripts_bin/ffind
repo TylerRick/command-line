@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# NAME
+# 	ffind - filter find (filters out unwanted .svn files)
+#
+# SYNOPSIS
+# 	ffind [path...] [expression]
+#
+# DESCRIPTION
+#	  Finds all files within the current directory that contain the string "search_term".
+#	  Excludes .svn files automatically. 
+#
+# EXAMPLES
+#   ffind .rb     # Find all Ruby files
+#   ffind Readme  # Find all Readme files
+
+#----------------------------------------------------------------------------------------------------
+# To do:
+
+# have nice switches like --exclude 'foodir' which gets translated into find format
+
+#----------------------------------------------------------------------------------------------------
+# Set up arguments
+
+# If they supplied $2, use $1 = path, $2 = expression
+if [ $# == 2 ]; then
+	path=$1
+	expression=$2
+# Otherwise, use $1 = expression
+elif [ $# == 1 ]; then
+	path=./
+	expression=$1
+else
+	echo "Usage: ffind [path...] [expression]"
+	exit 1
+fi
+
+
+#----------------------------------------------------------------------------------------------------
+# Pass them on to find
+
+#find $path \( \! -name "*.swp" \) -and \( \! -name "*.pyc" \) -and \( \! -name "*.svn*" \) -and \( -name "*$expression*" \) -exec echo {} \;
+find $path \( -type d -name .svn -prune \) -o \( -type f -name "*.swp" -prune \) -o \( -type f -name "*.rake" -prune \) -o \( -name "*$expression*" \) -exec echo {} \; | grep --color=auto $expression

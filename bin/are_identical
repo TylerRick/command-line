@@ -1,0 +1,11 @@
+#!/bin/bash
+
+echo $1 $2
+diff $1 $2 2> /dev/null
+
+while shift
+do
+	diff $1 $2 2> /dev/null
+	echo $1 $2
+done
+

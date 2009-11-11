@@ -1,0 +1,446 @@
+#!/usr/bin/ruby
+
+#---------------------------------------------------------------------------------------------------
+def usage
+  puts <<End
+Synopsis:
+  Usage: 
+    To create a file list:
+      #{File.basename($0)} --print-paths > <master_paths_list_file>
+    To use a file list as input:
+      #{File.basename($0)} <master_paths_list_file>|<path_to_master_tree>
+
+Detailed description:
+---------------------
+  A tool to synchronize directory trees by moving files (and optionally renaming them) in the "slave_tree" (or destination_tree) so that they match the paths in the "master_tree" (or source_tree) (as recorded in <paths_list_file>).
+
+  Or to put it another way, it lets you effectively* "play back" a sequence of moves and renames that you do in tree A onto some other (possibly remote on a different host) tree B.
+
+  (*That is the goal that this script tries to achieve, and it is effectively what it does, but not literally, because to lterally do that, your shell(s)/file manager would need to provide some way of *recording* all your file operations and I don't know of a way to do that. So the best we can do is imply what file operations must have/probably were done based on where the files are now on A and B. In order to recreate a truly accurate record of file operations, however, you'd need to take a snapshot (either copy the entire tree or just record all paths and metadata) of your tree before you start modifying it, and then actually do a 3-way merge to play back the changes: you'd play back the diff between snapshot_of_local_tree and local_tree_currently on top of remote_tree (which may or may not be the same as snapshot_of_local_tree, depending on if they've changed it since you got your copy of it or not).)
+
+  First, it searches the working directory (slave_tree) recursively to find the current paths of all files. Then attempts to move each file found such that its path matchs that given in <paths_list_file> (from master_tree).
+
+  Files that have the same basename (or, if using a custom matching algorithm, passes that custom test) in both master_tree and slave_tree are assumed to be identical. No checks are done to ensure that that is the case (idea for future feature: compute a hash of files in master_tree and slave_tree).
+
+  You must change the working directory to the root of slave_tree before running this command. Only slave_tree is modified; master_tree is not modified in anyway (indeed, you only provide the list of paths *relative* to the root of the master_tree directory -- this script doesn't know or care where master_tree is actually located).
+
+  If a directory given in <paths_list_file> does not exist locally (in slave_dir), it will be created.
+
+  If a file exists in master_tree but not in slave_tree (or vice versa), a warning is issued. Use --check-files-exist or similar if you want to abort without making any changes if there are any files missing from either tree.
+
+  <paths_list_file> can be created for a given master_tree like this:
+
+    cd master_tree
+    #{File.basename($0)} --print-paths > paths
+
+  Important assumptions made:
+  1. The files in the tree have not been renamed at all, only moved (if using the basic filename matching method); or (if using the first word matching method), the first word (IMG_4000, f.e.) is assumed to have been preserved, although users are free to append anything they want after the first word.
+
+
+Example/motivation:
+-------------------
+
+  Let's say you just got back from an unforgettable vacation on which you took a whole bunch of photos. Your friend Sam was on the same trip with you and wanted a copy of your photos, so you let him copy them to his computer straight from your memory card before you'd even had a chance to organize them into folders like you like to do, add titles to the filenames, and rotate the ones that are sideways. At the same time, he gives you a copy of the photos he took on his camera, straight from his card.
+
+  You merge the photos from both cameras into a folder you call 'Vacation' and then proceed to go through them all, organize them into subfolders, append a descriptive title to the filename, etc.
+
+  Of course, you want to share the fruits of your hard work with Sam so he doesn't have to go through the same process himself. Sure, you could give him a copy of your new merged and organized folder and tell him to replace his folder with yours, but there's at least two problems that I see with that:
+  1. It's inefficient. Your directory tree may be multiple gigabytes in size, which might be difficult to fit onto a single disk -- or worse, if Sam doesn't live locally to you, to transfer to him over the Internet. Besides, he already has all of your photos because you already gave them to him, so why should you have to give them to him again? It's only the metadata about the files that we want to give to him; not the actual data contained in the files themselves, which we assume to be identical (at least in this simple case).
+  2. It's unsafe. What if, say, Sam's wife had copied all the photos from *her* camera into Sam's folder and Sam didn't even realize it? Or what if he'd done some editing on some of the photos, and saved a version of IMG_4690.JPG with red-eye removed, say, as 'IMG_4690 - Fixed up.JPG'? Then he might accidentally delete all of her photos and all of his edited photos in the process if he deletes his directory tree and replaces it with yours. Clearly some kind of a merge would be safer and more desirable than outright replacing his directory tree with yours.
+
+  But what merge tool should he use?
+
+  The problem doesn't lend itself well to traditional file transfer (rsync)/directory merging tools, which would probably result in duplicate files stored in different subdirectories if the file happened to be under subdir a in master_dir and subdir b in master_dir. Normal merge/copy tools only check for duplicate/preexisting/conflicting files in subdirectories with the exact same relative path (within the same subdirectory) under both the master and slave trees. They don't do a deep search to find the file, like this tool aims to do.
+
+  What we need is a tool that:
+  1. is efficient: only requires the metadata (path information) to be transfered.
+  2. searches for matches within subfolders of any name.
+  3. does checks for files that are in one tree but not the other.
+
+  So in this example master_tree will represent the Vacation folder on your computer and slave_tree will represent a folder of the same purpose (but possibly a different name than yours) on your friend Sam's computer.
+  
+  These two different directory trees -- master_tree and slave_tree -- contain all the same files (for the most part) although some of them are in different subdirectories relative to the root of their respective trees.
+
+  File a.jpg, for example, is located within master_tree at 'At the park/a.jpg' but within slave_tree it is at 'their camera (unsorted)/a.jpg'.
+
+  They're supposed to be the same tree, of course, but they have gotten out of sync because you have done a bunch of organizing and rearranging within master_tree and it is now organized just the way you like it.
+
+  Now you want to bring slave_dir "up to sync" with master_dir.
+
+  $ cd slave_dir
+  $ #{File.basename($0)} ../master_dir
+
+  Within slave_dir, a.jpg will be moved from wherever it is into the directory 'At the park/'.
+
+  If the slave_dir is on a different host and you have ssh access and write-permissions, then you can do something like this:
+
+  $ cd master_dir
+  $ #{File.basename($0)} -p | ssh other_host 'cd slave_dir; #{File.basename($0)}'
+
+  If you want to share your work with someone else and you don't have ssh or write-permissions on their computer (a friend's computer, f.e.), you could e-mail/otherwise share the file list with them and tell them to run this command.
+
+  Once they have updated/synced their filenames, they/you can use rsync
+  give them read access to your directory tree so they could pull any files from you that they don't have, and the file list,
+
+
+Option ideas:
+-------------
+#  -o, --output : generates file list in specified file
+#    TODO: find better name; --output sounds like something that could be used in main mode to, but it can't
+  --print-paths
+    Same as: find -type f
+
+  --match-method= name of built-in match method or path to an .rb containing a custom one ... or maybe just an inline ruby expression/proc?
+  or --key-method?
+
+  --check-files-exist : ...
+
+  --missing-from-master=
+    warn
+    ignore
+    copy (can't really do that because we don't know what master is)
+
+  --missing-from-slave=
+
+  --compute-hash
+
+  --on-conflict=
+    replace
+    ask
+    replace-if-newer
+
+  --exclude
+End
+end
+
+#---------------------------------------------------------------------------------------------------
+=begin
+Ideas/to do:
+
+Allow custom matching code/tests/algorithms besides basename match
+
+This may necessitate support for input files with a format other than simply listing the desired path. For example:
+pattern_to_match new_path
+
+---
+
+Handle file conflicts better
+
+Don't just say which file conflicted if file exists; give extra info like date modified.
+But in order to do that, we'd need to know the path to master_dir. So let them optionally specify that?
+
+Bug: if same file exists in two places, our hash entry will get overwritten by one of them and we don't know which one
+if the final one to be in the hash is already in the right location, it will be skipped and there will be no conflict
+but otherwise, there will be a conflict
+this is inconsistent and should be fixed
+fixed for now by raising error if dup key
+end
+
+---
+
+And if they just path to master_dir, create path list automatically. Would be easier, and only possible, when slave and master are both accessible from same file system (both on same host). Otherwise (if master on different host), have to copy paths_list to slave host instead.
+
+---
+
+Make the --print-paths mode also record other metadata like hash, size, modified date, photo date
+
+=end
+
+
+#---------------------------------------------------------------------------------------------------
+require 'pathname'
+require 'rubygems'
+require 'quality_extensions/pathname'
+require 'quality_extensions/string/shell_escape'
+require 'quality_extensions/exception/inspect_with_backtrace'
+require 'rubygems'
+require 'colored'
+
+
+#---------------------------------------------------------------------------------------------------
+class Pathname
+  def shell_escape; to_s.shell_escape; end
+end
+
+class Hash
+
+  def without_existing_key_in(hash)
+    #puts "#{k}? #{hash.has_key?(k)}"; 
+    self.dup.delete_if{ |k,v| hash.has_key?(k) }
+  end
+
+end
+
+#---------------------------------------------------------------------------------------------------
+
+
+class TreePathMerger
+  attr_accessor :options
+
+  def self.build_paths_list(dir)
+    Dir.chdir dir do
+      list = []
+      Pathname('.').find do |path|
+        # Can't do directories because there will not be a match using our matching method...
+        # Could make it work if we did a 3-way merge though...
+        if path.file?
+          list << path.to_s
+        end
+      end
+      list
+    end
+  end
+
+  def add_path_to_list(list, path, match_method)
+    path = Pathname.new(path).cleanpath
+    key = match_method.call(path)
+    (STDERR.puts "Error: Two different paths ('#{path}' and '#{list[key]}') have the same key ('#{key}'). Please rename/delete one of the duplicates or use a different match method."; exit 1) if list.has_key?(key)
+    list[key] = path
+  end
+
+  def initialize(master_paths_list, options)
+    @options = options
+
+    case match_method
+    when 'first_word'
+      options[:match_method] = proc{ |path| path.basename.to_s =~ /(\w+)/; $1 }
+    else
+      options[:match_method] = proc{ |path| path.basename }
+    end
+
+    @mastr_paths = {}
+    @slave_paths = {}
+    master_paths_list.each do |path|
+      add_path_to_list @mastr_paths, path, match_method
+    end
+    TreePathMerger.build_paths_list('.').each do |path|
+      add_path_to_list @slave_paths, path, match_method
+    end
+    @mastr_paths.reject!{ |k,v| k.to_s == '.' }
+    @slave_paths.reject!{ |k,v| k.to_s == '.' }
+#    p @mastr_paths.keys
+#    p @slave_paths
+  end
+
+
+  def start
+    puts "Options: #{@options.inspect}\n\n" if verbose?
+
+    #-----------------------------------------------------------------------------------------------
+    any_missing = false
+    [
+      ["only in master, but not in slave", @mastr_paths, @slave_paths],
+      ["only in slave, but not in master", @slave_paths, @mastr_paths]
+    ].each do |which, a, b|
+      h = a.without_existing_key_in(b)
+      if h.any?
+        any_missing = true
+        puts "The following files exist #{which}:".red
+        h.each do |k,v|
+          puts "#{k} (#{v})"
+        end
+        puts
+      end
+    end
+
+    if any_missing && !options[:continue_if_missing]
+      print "Continue anyway? [Yn] "
+      resp = STDIN.gets.chomp
+      (puts 'Exiting'; exit) if resp[0..0]=='n'
+      puts
+    end
+
+    #-----------------------------------------------------------------------------------------------
+
+    for key, slave_path in @slave_paths do
+      mastr_path = @mastr_paths[key]
+      if mastr_path.nil?
+        puts "Skipping #{key}: didn't exist under master tree".yellow if verbose?
+      elsif slave_path == mastr_path
+        puts "Skipping #{key}: already at the same path as master tree".green if verbose?
+      else
+        if verbose?
+          puts
+          puts "Moving #{key} :".green
+          puts "  from #{slave_path}"
+          puts "  =>   #{mastr_path}"
+        end
+
+        handle_move(slave_path, mastr_path)
+      end
+    end
+
+  end
+
+  def handle_file_exists_conflict(path, dest, overridden_dest)
+    if verbose? || if_already_exists == :prompt
+      print "Destination file '".red + "#{dest}".bold.red + "' already exists. ".red 
+
+      if verbose?
+        puts
+        system %(ls -l #{(@master_absolute + path).shell_escape})
+        system %(ls -l #{dest.shell_escape})
+      end
+
+      if if_already_exists == :prompt
+        print "Overwrite with master, skip, or add suffix#{" (append '#{suffix}' to filename)" if suffix}? [o/S/a]> "
+        response = STDIN.gets
+        case response[0..0].downcase
+        when 'o'
+          action = :overwrite
+        when 'a'
+          action = :add_suffix
+          if suffix.nil?
+            print "Suffix (ex.: .suffix)? "
+            suffix = STDIN.gets.chomp
+          end
+        else
+          action = :skip
+        end
+      else
+        action = if_already_exists
+      end
+    end
+
+
+    case action
+    when :overwrite
+      puts "Overwriting '#{dest.to_s.bold}' with '#{(path).to_s.bold}'" if verbose?
+    when :add_suffix
+      overridden_dest = dest.add_suffix(suffix)
+    else
+      puts "Skipping" if verbose?
+    end
+
+    if overridden_dest
+      puts "Moving to overridden destination '#{overridden_dest.to_s.bold}'" if verbose?
+      if overridden_dest.exist?
+        STDERR.puts "'#{overridden_dest.to_s.bold}' already exists. Please select a different option.".red
+        redo
+      end
+    end
+
+    return action, overridden_dest
+  end
+
+
+  def handle_move(path, dest)
+    action = nil
+    overridden_dest = nil
+
+    if dest.exist?
+      action, overridden_dest = handle_file_exists_conflict(path, dest, overridden_dest)
+    else # !dest.exist?
+      # No conflict? No problem!
+    end
+
+    if !dest.dirname.exist?
+      puts "Destination directory '#{dest.dirname}' doesn't exist. Creating...".yellow if verbose?
+      dest.dirname.mkpath unless no_act?
+    end
+
+    unless action == :skip
+      mv_options = {}
+      #mv_options[:verbose] = true if verbose?
+      mv_options[:noop] = true if no_act?
+      begin
+        path.mv((overridden_dest||dest), mv_options)
+      rescue Exception
+        STDERR.puts "Encountered exception while trying to mv #{path} #{(overridden_dest||dest)}:"
+        raise
+      end
+    end
+  end
+
+  def verbose?; options[:verbose]; end
+  def no_act?;  options[:no_act]; end
+  def if_already_exists; options[:if_already_exists]; end
+  def suffix; @options[:suffix]; end
+  def match_method; @options[:match_method]; end
+end
+
+#---------------------------------------------------------------------------------------------------
+if $0 == __FILE__
+  require 'getoptlong'
+  opts = GetoptLong.new(
+    [ '--help', '--usage', '-h',                 GetoptLong::NO_ARGUMENT ],
+
+    [ '--print-paths', '-p',                     GetoptLong::NO_ARGUMENT ],
+    [ '--match-method', '-m',                    GetoptLong::REQUIRED_ARGUMENT ],
+
+    [ '--no-overwrite', '--skip', '-s',          GetoptLong::NO_ARGUMENT ],
+    [ '--overwrite', '-f',                       GetoptLong::NO_ARGUMENT ],
+    [ '--add-suffix', '-a',                      GetoptLong::NO_ARGUMENT ],
+    [ '--suffix',                                GetoptLong::REQUIRED_ARGUMENT ],
+
+    [ '--verbose', '-v',                         GetoptLong::NO_ARGUMENT ],
+    [ '--quiet', '-q',                           GetoptLong::NO_ARGUMENT ],
+    [ '--no-act', '--noop', '-n',                GetoptLong::NO_ARGUMENT ]
+  )
+  options = {}
+  mode = nil
+  options[:if_already_exists] = :prompt
+  opts.each do | opt, arg |
+    case opt
+    when '--help', '--usage', '-h'
+      usage; exit 1
+
+    when '--print-paths', '-p'
+      mode = :print_paths
+      #output_file = Pathname.new(arg)
+
+    when '--match-method', '-m'
+      options[:match_method] = arg
+
+    when '--no-overwrite', '--skip', '-s'
+      options[:if_already_exists] = :skip
+    when '--overwrite', '-f'
+      options[:if_already_exists] = :overwrite
+    when '--add-suffix', '-a'
+      options[:if_already_exists] = :add_suffix
+    when '--suffix'
+      options[:suffix] = arg
+
+    when '--verbose', '-v'
+      options[:verbose] = true
+    when '--quiet', '-q'
+      options[:quiet] = true
+    when '--no-act', '--noop', '-n'
+      options[:no_act] = true
+      options[:verbose] = true
+    end
+  end
+
+  #if output_file
+  if mode == :print_paths
+    paths_list = TreePathMerger.build_paths_list('.')
+    puts paths_list
+    exit 0
+  end
+
+  if @read_from_stdin
+    if STDIN.tty?
+      usage; exit 1
+    end
+    paths_list = STDIN.read
+  else
+    if ARGV.size < 1
+      usage; exit 1
+    end
+    file = Pathname.new(ARGV[0])
+    if file.file?
+      paths_list = file.read.lines.map(&:chomp)
+    elsif file.directory?
+      paths_list = TreePathMerger.build_paths_list(file)
+    else
+      STDERR.puts "Not a file or directory: #{file}"
+      exit 1
+    end
+  end
+
+
+  merger = TreePathMerger.new(paths_list, options)
+  merger.start
+end
+
+

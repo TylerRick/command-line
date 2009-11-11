@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+# Deprecated! See gem_dir_of
+path=`gem which #{ARGV[0]} 2>/dev/null | tail -n1`.chomp
+puts path
+file=`basename #{path}`
+path=`dirname #{path}`
+#pushd #{path}
+#cat $file

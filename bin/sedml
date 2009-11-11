@@ -1,0 +1,25 @@
+#!/bin/sh
+# based on sedml from http://www.ilfilosofo.com/blog/2008/04/26/sed-multi-line-search-and-replace/,
+# but this version lets you operate on a stream (pipe the input into and the output out of this command) rather than operating on a file 
+# Examples:
+#   cat file | sedml 's/a/A/g'
+#   sedml 's/a/A/g' <file
+#
+#   # Turn a \n-delimited list into a single-line, ,-delimited list
+#   ... | sort | sedml 's/\n/,/g'
+
+cat - | sed -n '
+# if the first line copy the pattern to the hold buffer
+1h
+# if not the first line then append the pattern to the hold buffer
+1!H
+# if the last line then ...
+$ {
+        # copy from the hold to the pattern buffer
+        g
+        # do the search and replace
+        '"$1"'
+        # print
+        p
+}
+'

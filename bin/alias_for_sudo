@@ -1,0 +1,2 @@
+alias
+echo "alias rm='rmi'"

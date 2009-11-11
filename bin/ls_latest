@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# Returns the latest entry returned by ls (when sorted by time)
+# It accepts the same options as ls, since it is simply a wrapper for ls, after all.
+
+# Examples:
+#
+# > ll log/
+# total 40
+# -rw-r--r-- 1 tyler tyler 18997 2009-01-20 23:31 20090120T2324
+# -rw-r--r-- 1 tyler tyler 11231 2009-01-20 23:35 20090120T2331
+# -rw-r--r-- 1 tyler tyler  5783 2009-01-20 23:37 20090120T2335
+# 
+# > ls_latest log/
+# log/20090120T2335
+
+# > ls_latest
+# some_file
+
+# > ls_latest dir/*
+# dir/some_file
+
+# Unfortunately, since it uses -d to prevent listing of subdirectories, it might actually match a subdirectory instead of a normal file...
+# TODO: maybe -d should not be default then?
+# > ls_latest dir/
+# dir/
+#
+# > ls_latest dir/*
+# dir/some_subdir
+
+# So if possible, specify a more specific glob, or don't use it in directories containing subdirectories.
+# > ls_latest Music/*.mp3
+# Music/Some Song.mp3
+
+if [ "_$1" = "_-h" ]; then
+    echo "Usage: ls_latest <dir>"
+    exit 1
+fi
+
+ls -t "$@" | head -n 1
+
+
+# Old, when using -d by default:
+#if [ $# -lt 1 ]; then
+#    # Default to current working directory
+#    ls -t  | head -n 1
+#else
+#    ls -t "$@" | head -n 1
+#fi
+#
+# Unfortunately, since it uses -d to prevent listing of subdirectories, it might actually match a subdirectory instead of a normal file...
+# TODO: maybe -d should not be default then?
+# > ls_latest dir/
+# dir/
+#
+# > ls_latest dir/*
+# dir/some_subdir
+
+# So if possible, specify a more specific glob, or don't use it in directories containing subdirectories.
+# > ls_latest Music/*.mp3
+# Music/Some Song.mp3

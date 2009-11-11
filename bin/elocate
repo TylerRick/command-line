@@ -1,0 +1,23 @@
+#!/bin/bash
+# A wrapper for locate
+# like egrep
+#   Accepts a regular expression as arg1
+#   (So remember to escape literal '.'s and such ... elocate '\.iso')
+# Since I almost always only want to match against basename, it includes --basename hard-coded.
+
+
+# elocate Pictures
+# locate --basename -rPictures$ | grep --color -i Pictures
+
+# old: locate -r"$pattern\$" -i | grep --color -i "$pattern"
+
+pattern=$1
+grep_pattern=$1
+
+if echo "$pattern" | grep '^\^'; then
+  # If the search expression starts with ^, then we shouldn't pipe it to grep because grep will try to match against the entire path instead of the basename, and will fail.
+  # So strip off the ^.
+  grep_pattern=`echo $pattern | sed 's/^\^//'`
+  #locate --basename -r"$pattern"
+fi
+locate --basename -r"$pattern" | grep --color -i "$grep_pattern"

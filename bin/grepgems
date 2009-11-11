@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cgrep "$1" /usr/lib/ruby/gems/1.8/gems/

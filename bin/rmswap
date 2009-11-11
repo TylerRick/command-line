@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+
+def usage
+  puts <<End
+Usage: rmswap file.txt    # removes .file.txt.swp if it exists
+       rmswap -r          # recursively removes all .swp files in the current directory
+End
+end
+
+def rm(file, verbose = true)
+  puts "Removing '#{file}'..." if verbose
+  system "rm '#{file}'"
+end
+
+if ARGV[0].nil?
+  usage
+elsif ARGV[0] == '-r'
+  files = `find -name '.*.sw*'`.split("\n")
+  if files.any?
+    puts 'Delete all of these files?'
+    puts files
+    print "Continue? (y/n) "
+    if STDIN.gets[0..0].downcase == 'y'
+      files.each do |file|
+        rm file
+      end
+    end
+  else
+    puts "No swap files found"
+  end
+else
+  dir, file = File.dirname(ARGV[0]), File.basename(ARGV[0])
+  file = ".#{file}.sw*"
+  glob = "#{dir}/#{file}"
+  Dir[glob].each do |file|
+    rm file
+  end
+end

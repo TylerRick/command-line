@@ -1,0 +1,2 @@
+# http://www.unix.com/shell-programming-scripting/16284-block-size-du-output.html
+ls -Rls $1 --block-size=1 | grep "^total" | awk 'BEGIN{c=0} {c+=$2} END{print c}'

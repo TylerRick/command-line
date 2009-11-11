@@ -1,0 +1,15 @@
+#!/usr/bin/ruby
+
+# Unlike a normal url_decode, +'s are preserved
+# a%20+%20b => a + b
+
+require "cgi"
+
+def decode_bookmarklet(s)
+  s.gsub! '+', 'PLUS_SIGN'
+  s = CGI::unescape(s)
+  s.gsub! 'PLUS_SIGN', '+'
+end
+
+puts decode_bookmarklet(STDIN.read)
+

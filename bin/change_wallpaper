@@ -1,0 +1,104 @@
+#!/usr/bin/env ruby
+# ~/public/shell/bin/change_wallpaper.log
+
+#---------------------------------------------------------------------------------------------------
+# To do:
+# * add file_pattern option so you can specify a glob (*.jpg) or regexp (/(favorite)/)
+# * make it so you can set priorities (embed in filename?) for how frequently a wallpaper will be used or exclude it from being shown entirely
+#   prevent repeats until cycled through all? or too complicated?
+# * see 'To do' from '/media/1t/Pictures/Wallpaper/Digital Blasphemy/download.rb'
+
+#---------------------------------------------------------------------------------------------------
+require 'pathname'
+require 'yaml'
+
+require 'rubygems'
+require 'facets/random'
+
+#---------------------------------------------------------------------------------------------------
+
+class WallpaperChanger
+  attr_reader :config_path, :config
+
+  def initialize(config)
+    @config = config
+  end
+
+  def dirs
+    dirs = @config['dirs']
+    raise 'No dirs specified' if dirs.nil? || dirs.empty?
+    dirs
+  end
+
+  def log_file
+    if @config['log_file'] == true
+      log_path = Pathname.new(CFilePath.to_s + '.log')
+    elsif t = @config['log_file']
+      log_path = Pathname.new(t)
+    else
+      log_path = nil
+    end
+    log_path
+  end
+
+  def debug?
+    !!@config['debug']
+  end
+
+  def log(output)
+    return unless log_file
+    log_file.open('a') do |file|
+      file.puts output
+    end
+  end
+
+  def desktops_count
+    command = %(gconftool-2 --get /apps/compiz/general/screen0/options/hsize)
+    log "# Executing #{command}..." if debug?
+    result = `#{command}`
+    result.to_i
+  end
+
+  def files_needed
+    desktops_count
+  end
+
+  def set_wallpaper(image_paths)
+    command = %(gconftool-2 --type list --list-type string --set /apps/compiz/plugins/wallpaper/screen0/options/bg_image '[#{image_paths.join(',')}]')
+    system command
+    log "# Executing #{command}..." if debug?
+  end
+
+  def available_files
+    available_files = dirs.
+                      inject([]) {|array, dir| array + Dir["#{dir}/*"]}.
+                      reject     {|file|       !File.file?(file) }
+  end
+
+  def start
+    log '----------'*80
+    log '# ' + Time.now.strftime("%Y-%m-%d %H:%M:%S")
+
+    available_files = available_files()
+    raise "No files found in dirs (#{dirs.join(', ')})" if available_files.empty?
+    raise "Needed #{files_needed} files, but only found #{available_files.size}" if available_files.size < files_needed
+
+    new_files = available_files.
+                pick(files_needed).
+                map {|a| a.gsub(',', '\,')}
+
+    set_wallpaper(new_files)
+    log new_files
+  end
+end
+
+#---------------------------------------------------------------------------------------------------
+if $0 == __FILE__
+  STDOUT.sync = true
+
+  CFilePath   = Pathname.new(__FILE__)
+  config_path = Pathname.new(CFilePath.to_s + '.yaml')
+  config      = YAML.load(config_path.read)
+
+  WallpaperChanger.new(config).start
+end

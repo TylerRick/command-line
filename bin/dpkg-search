@@ -1,0 +1,2 @@
+echo "apt-cache search \"$@\""
+apt-cache search "$@"

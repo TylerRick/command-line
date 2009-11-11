@@ -1,0 +1,5 @@
+#!/bin/bash
+basename=`basename $1`
+wget "$@"
+echo $1 > $basename.source
+echo "Saved source '$1' in $basename.source"

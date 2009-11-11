@@ -1,0 +1,6 @@
+# $1 = foo.wma
+# -af resample=44100
+mplayer -vo null -vc null -ao pcm:waveheader:file=$1.wav $1 \
+  && lame -m s $1.wav -o $1.mp3 \
+  && rm $.wav
+

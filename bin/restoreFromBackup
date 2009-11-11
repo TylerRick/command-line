@@ -1,0 +1,5 @@
+#!/bin/bash
+#echo mv --interactive $1.backup $1
+#mv --interactive $1.backup $1
+echo mv $1.backup $1
+mv $1.backup $1

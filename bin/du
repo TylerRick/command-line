@@ -1,0 +1,7 @@
+#!/usr/bin/ruby
+
+# to do:
+# tee output so it's real-time
+# then when finished, sort it
+
+exec "/usr/bin/du #{ARGV.join(' ')}"

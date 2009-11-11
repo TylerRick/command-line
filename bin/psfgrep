@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Same as psgrep only with the 'f' (forest) option
+ps auxf | grep -v '/psfgrep\|\\_ grep --color -i' | grep --color -i -B5 "$@"

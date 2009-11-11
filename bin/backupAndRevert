@@ -1,0 +1,9 @@
+#!/bin/bash
+cp --interactive $1 $1.backup
+if test $? = 0 ; then
+	ls -al $1.backup
+	svn revert $1
+else
+	echo "Could not copy. Aborting."
+	exit 1
+fi

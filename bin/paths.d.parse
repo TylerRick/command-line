@@ -1,0 +1,15 @@
+#!/bin/bash
+# See also: /etc/bash.bashrc /etc/profile
+for file in ~/.paths.d/*; do
+  path=`cat $file`
+  # Paths in $PATH that contain ~ can cause problems, so expand them now.
+  path=`echo $path | ruby -e 'puts File.expand_path(STDIN.gets.chomp)'`
+
+  echo $PATH | grep "$path" > /dev/null
+  if [ "$?" = "1" ]; then
+    # If running non-interactively, don't echo anything
+    [ -z "$PS1" ] || echo "Adding $path to PATH..."
+    export PATH=$path:$PATH
+  fi
+done
+#echo $PATH

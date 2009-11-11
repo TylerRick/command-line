@@ -1,0 +1,17 @@
+#!/bin/sh
+echo $1 | grep '^http'
+if [ "$?" = "0" ]; then
+    url=$1
+else
+    echo $1 | grep '^/'
+    if [ "$?" = "0" ]; then
+        url=file://$1
+    else
+        url=file://`pwd`/$1
+    fi
+fi
+echo firefox -P 'Tyler (Main)' -remote "openUrl($url,new-window)"
+firefox -P 'Tyler (Main)' -remote "openUrl($url,new-window)"
+
+#read x
+

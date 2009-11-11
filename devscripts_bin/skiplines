@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ "$1" == "--help" ]; then
+  cat <<End
+Skip n lines at beginning of stream
+
+cat file | skilines [lines_to_skip]
+(lines_to_skip is 1 by default)
+
+> echo -e "1\n2\n3\n4\n5" | skiplines
+2
+3
+4
+5
+
+> echo -e "1\n2\n3\n4\n5" | skiplines 3
+4
+5
+End
+  exit 1
+fi
+if file $( readlink /proc/$$/fd/0 ) | grep -q "character special"; then
+  # Standard input
+  echo "Error: Detected that input was standard input. You MUST pipe a stream to this command."
+  echo "$0 --help for help"
+  exit 1
+fi
+#---------------------------------------------------------------------------------------------------
+
+t=${lines_to_skip:=${1:-1}}
+
+# Discard $lines_to_skip
+for (( i = 1 ; i <= $lines_to_skip ; i++ )); do
+  read garbage
+done
+
+# Now output the rest
+cat -

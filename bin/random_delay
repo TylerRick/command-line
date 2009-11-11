@@ -1,0 +1,30 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'facets/random'
+
+n     = (ARGV[0] || 60).to_i
+units = ARGV[1] || 'minutes'
+verbosity = 0
+
+# Convert to seconds
+case units
+when 'minutes'
+  n *= 60
+when 'hours'
+  n *= 60*60
+end
+
+r = Random.number(n).to_i
+
+case units
+when 'minutes'
+  r_in_units = r / 60
+when 'hours'
+  r_in_units = r / (60*60)
+end
+
+puts "Sleeping for #{r_in_units} #{units} (#{r} s)" if verbosity >= 1
+sleep r
+#sleep_loudly r if verbosity >= 2
+puts 'Done sleeping.' if verbosity >= 1

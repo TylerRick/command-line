@@ -1,0 +1,7 @@
+
+# ls -lt ~/.mozilla/firefox/Tyler/session*
+# ls -t1d ~/.mozilla/firefox/Tyler/sessions/* | xargs -I: -n1 grep '^name=' --color=auto :
+for file in `ls -t1d ~/.mozilla/firefox/Tyler/sessions/*`; do
+    echo "$file"
+    [ -e "$file" ] && grep '^name=' --color=auto --max-count=1 "$file" 2>/dev/null
+done

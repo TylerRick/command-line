@@ -1,0 +1,2 @@
+echo `ffind ~/svn config.*php.dist | grep -v taskmaster | grep -v bin | grep -v shared_config`
+

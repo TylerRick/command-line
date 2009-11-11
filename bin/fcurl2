@@ -1,0 +1,5 @@
+fcurl \
+--cookie-jar cookie-jar.txt \
+--include \
+--location \
+ "$@"

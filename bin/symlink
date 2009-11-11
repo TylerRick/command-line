@@ -1,0 +1,20 @@
+#!/usr/bin/ruby
+
+#~/src/media_players/gpodder (master) > #ln -s data/gpodder.glade  /home/tyler/dev/inactive/media_players/gpodder/share/gpodder/gpodder.glade
+# Produced this broken link, because the symlink was relative to itself not the working directory of where I was when I created the symlink!
+#~/src/media_players/gpodder (master) > #/home/tyler/dev/inactive/media_players/gpodder/share/gpodder/gpodder.glade -> data/gpodder.glade
+
+require 'pathname'
+wd = Pathname.new(Dir.getwd)
+symlink = wd + Pathname.new(ARGV[1])
+target = wd + Pathname.new(ARGV[0])
+if symlink.directory?
+  symlink = symlink+ target.basename
+end
+#puts symlink
+#puts target
+if target.relative?
+  target = target.relative_path_from(symlink.parent)
+end
+puts "Creating symlink symlink #{symlink} to target #{target}..."
+system "ln -s '#{target}' '#{symlink}'"

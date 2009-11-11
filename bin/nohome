@@ -1,0 +1,3 @@
+#!/bin/bash
+# Example use: find -type d | ~/bin/nosvn
+cat - | grep -v "/home/"

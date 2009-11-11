@@ -1,0 +1,40 @@
+#!/bin/bash
+# A wrapper for grep that filters out .svn, .swp, etc. and binary files to speed up searching.
+
+if [ $# -lt 1 ]
+then
+	echo "Usage: `basename $0` search_term [directory] [grep_options] [find_options]"
+	echo "Case insensitive:"
+    echo '  cgrep search_term . -i'
+	echo "Regular expressions:"
+    echo '  cgrep "user_.*\(path\|url\)" app/ '
+	echo "Defaults to --binary-files=without-match but can be overridden, f.e.:"
+	echo '  cgrep search_term . --binary-files=text'
+
+	exit 1
+fi
+
+# This block is duplicated between cgrep, cfgrep, and vimgrep. If you change
+# something in one place, you should probably change it in all.
+search_term=${1}
+directory=${2:-"./"}
+grep_options=${3:-""}
+find_options=${4}
+#echo search_term=$search_term
+#echo directory=$directory
+#echo grep_options=$grep_options
+#echo find_options=$find_options
+#echo "-------------------------"
+
+find $directory $find_options \( -type f -regex ".*\.\(swp\|tmp\)$" -prune \) \
+                          -o \( -type d -name .git -prune \) \
+                          -o \( -type d -name .svn -prune \) \
+                          -o \( -type d -name vendor -prune \) \
+                          -o \( -type d -name storage -prune \) \
+                          -o \( -type d -name vendor_gems -prune \) \
+                          -o \( -type d -name vendor_plugins -prune \) \
+                          -o \( -type d -name log -prune \) \
+						  -o \( -type d -name zotero -prune \) \
+						  -o \( -type d -name Cache -prune \) \
+						  -o \( -type d -name adblockplus -prune \) \
+						  -o -exec grep --binary-files=without-match --color -n $grep_options "$search_term" -H {} \;

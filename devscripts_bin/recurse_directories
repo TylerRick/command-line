@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# A replacement for `find`?
+
+
+require "DirectoryRecurser"   # Don't forget to set your $RUBYLIB
+require "ObjectOrientedFile"
+
+
+if ARGV[0]
+  start_dir = ARGV[0]
+else
+  start_dir = "./"
+end
+
+recurser = DirectoryRecurser.new([".svn"])
+
+recurser.recurse(start_dir) { |file_path| 
+  file = File.new(file_path)
+
+  # See http://www.ruby-doc.org/core/classes/File.html for more things you can do with files
+  #puts file.mtime
+  #puts file.path
+  puts file.dirname + "/" + file.basename
+}

@@ -1,0 +1,48 @@
+#!/usr/bin/ruby
+# Scenario: You have a cron job whose output you filter / grep for certain interesting key words (like 'warning' or 'error') because you don't want to get an e-mail every minute with something really un-notable or clutter your log file with uninteresting junk. That's easy enough:
+#
+# */2 *   *   *   *   /usr/bin/curl --silent http://www.example.com/cerberus_helpdesk/cron?loglevel=6 | grep WARN >>$cerb_log
+#
+# But what if you also want to timestamp the output each time there is any? This is what I tried:
+#
+# */2 *   *   *   *   /bin/date '+\%Y-\%m-\%d \%H:\%M:\%S' >>$cerb_log ; /usr/bin/curl --silent http://www.example.com/cerberus_helpdesk/cron?loglevel=6 | grep WARN >>$cerb_log
+#
+# The problem with that, however, is that it will log the timestamp *every* time that cron command is executed, even when there was no output from the "real" part of the command...
+#
+#2009-02-25 01:34:01
+#2009-02-25 01:36:01
+#2009-02-25 01:38:01
+#[WARN]: [Parser] Ignoring incoming ticket sent by ourselves: ___@___<BR>
+#2009-02-25 01:40:01
+#2009-02-25 01:42:01
+#2009-02-25 01:44:01
+#2009-02-25 01:46:01
+#
+#
+# Solution: This script, which will insert a timestamp into the stream for you *only* when the stream it receives in standard input is non-empty.
+#
+# */2 *   *   *   *   /usr/bin/curl --silent http://www.example.com/cerberus_helpdesk/cron?loglevel=6 | grep WARN | timestamp_stream_or_pass >>$cerb_log
+#
+# So now the log file contents go something more like this:
+#
+#2009-02-25 15:48:07
+#[WARN]: [Parser] Ignoring incoming ticket sent by ourselves: ___@___<BR>
+#2009-02-25 16:10:14
+#[WARN]: [Parser] Ignoring incoming ticket sent by ourselves: ___@___<BR>
+
+
+require 'rubygems'
+require 'facets/blank'
+
+if STDIN.tty?
+  puts "Please pipe a stream of input to this script on stdin."
+  command = "echo example | #{$0}"
+  puts "Example: #{command}"
+  system command
+  exit 1
+end
+input = STDIN.read
+if !input.blank?
+  puts Time.now.strftime('%Y-%m-%d %H:%M:%S')
+  puts input
+end

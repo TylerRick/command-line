@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+require 'fileutils'
+enabled_path = ARGV[0]  # vendor/plugins/bad_plugin
+if enabled_path =~ %r[vendor/plugins]
+  FileUtils.mkdir_p 'vendor_plugins'
+  disabled_path = enabled_path.gsub('vendor/plugins', 'vendor_plugins')
+else
+  disabled_path = enabled_path.gsub('/', '_')
+end
+puts "Renaming      #{enabled_path} to #{disabled_path}"
+puts "To re-enable: mv #{disabled_path} #{enabled_path}"
+FileUtils.mv enabled_path, disabled_path
