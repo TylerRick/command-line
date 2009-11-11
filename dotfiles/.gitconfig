@@ -32,7 +32,7 @@
 	tool = "p4merge" 
 [mergetool "p4merge"]
 	#cmd = ~/bin/p4merge \
-	cmd = /home/tyler/Software/Perforce/p4v/bin/p4merge \
+	cmd = $HOME/installed/shell/bin/p4merge \
 		"$PWD/$BASE" \
 		"$PWD/$LOCAL" \
 		"$PWD/$REMOTE" \
