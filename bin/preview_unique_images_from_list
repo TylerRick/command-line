@@ -1,0 +1,74 @@
+#!/usr/bin/ruby
+
+#---------------------------------------------------------------------------------------------------
+# Parse args
+
+require 'optparse'
+@options = {
+}
+
+def parse_args
+  ARGV.options do |opts|
+    opts.banner = <<End
+Usage: #{File.basename($0)} outfile.html
+
+Example:
+  elocate checkbox -i | egrep png$\|jpg$D\|gif$ | #{File.basename($0)} checkbox_images.html
+End
+
+    opts.on("-b", "--browser", "Open output file in browser when finished ")                                            { @options[:browser] = true }
+    opts.on("-v", "--verbose", "Be more verbose")                                                                       { @options[:verbose] = true }
+    opts.separator ""
+    opts.on("-h", "--help", "Show this help message.")                                                                  { puts opts; exit }
+    opts.parse!
+  end
+end
+parse_args
+
+if ARGV.size < 1
+  # TODO: is there a less kludgy way to do this?
+  ARGV.unshift '--help'
+  parse_args
+end
+
+outfile, rest = *ARGV
+
+#---------------------------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+# Main
+require 'pathname'
+require 'facets/kernel/returning'
+require 'facets/enumerable/uniq_by'
+require 'quality_extensions/enumerable/all_same'
+require 'quality_extensions/pathname'
+
+files = STDIN.read.lines.map(&:chomp)
+
+#puts Pathname.new('./app/views/contacts').size
+#exit
+sizes = files.inject({}) {|sizes, path|
+  returning sizes do
+    begin
+      sizes[Pathname.new(path)] = Pathname.new(path).size
+    rescue
+      puts $!
+    end
+  end
+}
+
+puts sizes.size
+sizes = sizes.uniq_by {|k,v| v}
+puts sizes.size
+
+files = sizes.map(&:first)
+
+#require 'pp'
+#pp sizes
+
+File.open(outfile, 'w') do |out|
+  files.each do |file|
+    local_url = "file://#{file.absolutize}"
+    out.puts %(<img src="#{local_url}" width="200" style="float:left" />)
+  end
+end

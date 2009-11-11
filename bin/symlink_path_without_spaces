@@ -1,0 +1,49 @@
+#!/usr/bin/ruby
+# vim filter command (see help filter)
+# Example:
+#   ~/Other\ documents/Good\ ideas.txt
+# Creates folder ~/Other_documents/Good\ ideas.txt
+# And then creates symlink from:
+#   ~/Other_documents/Good_ideas.txt
+# to:
+#   ~/Other\ documents/Good\ ideas.txt
+#
+# Outputs the new path, so if used as a vim filter, replaces the old path (which you can't use gf to follow/open) with the name path (which you can)
+#
+=begin To do
+Make it useful as a normal command (not just vim filter command)
+
+Take input from ARGV too in addition to STDIN.
+
+Maybe break into two commands, the STDIN one passing its input to main one on ARGV.
+
+If filenames on input to include the \ used to escape a space, it assumes you want this stripped before dereferencing the filename. In rare occasions, you may not want this. In those cases, this script doesn't work.
+
+> touch 'strange\ filename'
+
+> ls -al strange\\\ filename 
+-rw-r--r-- 1 tyler tyler 0 2009-08-24 13:18 strange\ filename
+=end
+
+require 'pathname'
+require 'rubygems'
+require 'quality_extensions/pathname'
+require 'quality_extensions/string/prefix_lines'
+
+lines = STDIN.read.lines.map(&:chomp).map {|a| File.expand_path(a)}
+
+lines.each do |filename|
+  new_filename = filename.gsub(/\\ /, '_')
+  new_pathname = Pathname.new(new_filename)
+  dirname, basename = Pathname.new(new_filename).split
+  dirname.mkpath # create directory if it doesn't exist, so that making a symlink won't break
+  begin
+    filename_unescaped_spaces = filename.gsub(/\\ /, ' ')
+    new_pathname.make_symlink filename_unescaped_spaces
+  rescue Errno::EEXIST
+  end
+  #system "ls -al #{new_filename}"
+  puts new_filename
+end
+
+exit 0

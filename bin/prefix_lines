@@ -1,0 +1,23 @@
+#!/usr/bin/ruby
+# a filter/pipeline command
+
+def usage
+  puts <<End
+stdin | prefix_lines <prefix>
+End
+  exit
+end
+
+usage if ARGV.size == 0
+prefix = ARGV[0]
+
+#---------------------------------------------------------------------------------------------------
+#require 'quality_extensions/string/prefix_lines'
+
+@strip = true
+
+lines = STDIN.lines.map do |line|
+  line = prefix + line
+end
+puts lines.join
+

@@ -1,0 +1,4 @@
+#swap a b should do:
+#mv a b.new
+#mv b a
+#mv b.new b

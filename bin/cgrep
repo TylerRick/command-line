@@ -1,0 +1,113 @@
+#!/usr/bin/ruby
+# See also its predecessor, ~/public/shell/devscripts_bin/cgrep
+
+#---------------------------------------------------------------------------------------------------
+# Parse args
+
+require 'optparse'
+
+@options = {
+}
+
+# parse_args only works with a clone of ARGV -- this removes the options (and their arguments) from ARGV itself
+def consume(*args)
+  #puts "Consuming #{args.inspect} from #{ARGV.inspect}"
+  args.each {|arg| ARGV.delete(arg) }
+#  ARGV.options do |opts|
+#    opts.on(*args) {}
+#    opts.parse!
+#  end
+  #puts "ARGV: #{ARGV.inspect}"
+  #@args_backup = @args.clone
+end
+
+def parse_args
+  @args = ARGV.clone # this array represents options for this program and *not* for grep or find
+  @args_backup = @args.clone
+  @args.options do |opts|
+    opts.banner = <<End
+Usage: #{File.basename($0)} search_term [directory] [grep_options] [find_predicates] [find_options]
+End
+
+    #opts.on("-a", "--text", "")         { @options[:binary_files] = :text }
+    #opts.separator ""
+
+    args = ["-v", "--verbose", "Be more verbose"]
+    opts.on(*args)         { @options[:verbose] = true; consume(*args) }
+
+    opts.separator ""
+    opts.on("-h", "--help", "Show this help message.")    { puts opts; exit }
+
+    begin
+      #p @args
+      opts.parse!
+    rescue OptionParser::InvalidOption
+      @args = @args_backup.clone
+      @args.delete($!.args.first)
+      #p $!
+      #opts.on(*$!.args) {}
+      #didn't work because ARGV got wiped out as soon as it hit an InvalidOption
+      redo
+    end
+  end
+end
+parse_args
+
+#if ARGV[0] == '-v'
+#  @options[:verbose] = true
+#  ARGV.shift
+#end
+
+if ARGV.size == 0
+  # TODO: is there a less hacking way to do this?
+  ARGV.unshift '--help'
+  parse_args
+end
+
+search_term     = ARGV.shift
+directory       = ARGV.shift || './'
+grep_options    = (ARGV.shift||'').split(' ')
+find_predicates = (ARGV.shift||'').split(' ')
+find_options    = (ARGV.shift||'').split(' ')
+
+if @options[:verbose]
+  puts "search_term: #{search_term.inspect}"
+  puts "grep_options: #{grep_options.inspect}" if grep_options.any?
+  puts "find_predicates: #{find_predicates.inspect}"
+end
+
+input_files_are_utf16 = false
+
+#---------------------------------------------------------------------------------------------------
+# Main
+
+require 'quality_extensions/string/prefix_lines'
+require 'quality_extensions/enumerable/map_with_index'
+
+grep_options << '--binary-files=without-match' unless (grep_options & ['-a', '--text', '--binary-files']).any?
+grep_options << '--color'          unless (grep_options & ['--no-color']).any?
+grep_options << '--with-filename'  unless (grep_options & ['-h', '--no-filename']).any? || input_files_are_utf16
+
+find_predicates << '\( -type f -regex ".*\.\(swp\|tmp\|log\|min.js\|pack.js\|schema\|sql\|css\)$" -prune \)'
+find_predicates << '\( -type d -name .git -prune \)'
+#find_predicates << '-print'
+
+if input_files_are_utf16
+  find_predicates << %{-exec sh -c 'iconv -f UTF-16 -t UTF-8 {} | grep #{grep_options.join(' ')} "#{search_term}" | prefix_lines "{}:"' \\;}
+else
+  find_predicates << %{-exec grep #{grep_options.join(' ')} "#{search_term}" {} \\;}
+end
+
+command = 'find '
+command << directory + ' '
+last = find_predicates.size-1
+find_predicates.map_with_index! {|s, i| i==0    ? s : s.prefix('-o ') }
+find_predicates.map_with_index! {|s, i| i==last ? s : s.suffix(" \\") }
+find_predicates = find_predicates.join("\n")
+
+command << find_predicates
+puts "#{command}" if @options[:verbose]
+
+system command
+
+#---------------------------------------------------------------------------------------------------

@@ -1,0 +1,11 @@
+#!/bin/sh
+rm -f $0
+
+Hello agent $USER, your mission should you choose to accept it:
+$ ./configure
+$ make
+$ make install (as root)
+
+Good luck.
+
+This file will self-destruct if executed

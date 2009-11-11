@@ -1,0 +1,3 @@
+#!/bin/sh
+
+wmctrl -lp|gawk '{print $3}'|xargs ps

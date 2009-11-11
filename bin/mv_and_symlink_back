@@ -1,0 +1,45 @@
+#!/usr/bin/ruby
+require 'rubygems'
+require 'quality_extensions/pathname'
+require 'facets'
+
+
+def system_v(command)
+  puts command
+  system command
+end
+
+#---------------------------------------------------------------------------------------------------
+
+# TODO: getopt
+@verbose = true
+
+def usage
+  puts <<End
+Usage: mv_and_symlink_back <old_path> <new_path>
+
+Example:
+  mv_and_symlink_back /path/to/Notes/Games /path/to/Games/Notes 
+is shorthand for:
+  mv /path/to/Notes/Games /path/to/Games/Notes
+  ln -s /path/to/Games/Notes /path/to/Notes/Games
+End
+  exit 1
+end
+
+if ARGV.size != 2
+  $stderr.puts "Expected exactly 2 arguments"; exit 1
+end
+
+source, dest = ARGV[0], ARGV[1]
+source, dest = [source, dest].map {|p| p.chomp('/') } # remove trailing '/' so that we don't get this error from ln: target `/path/to/source/' is not a directory: No such file or directory
+source, dest = [source, dest].map(&Pathname)
+
+[source, dest.dirname].each do |p|
+  ($stderr.puts "Expected #{p} to be a directory but was not"; exit 1) if !p.directory?
+end
+
+source.mv dest, :verbose => @verbose
+
+dest = dest.absolutize
+system_v %(ln -s #{dest} #{source})

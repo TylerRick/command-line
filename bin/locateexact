@@ -1,0 +1,5 @@
+#!/bin/bash
+# A wrapper for locate
+
+# Apparently \ is a glob character, which, when present, prevents the implicit adding of the default glob, *pattern*
+locate --basename '\'"$1"

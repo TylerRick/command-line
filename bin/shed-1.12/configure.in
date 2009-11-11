@@ -1,0 +1,16 @@
+AC_INIT(shed.c)
+AM_INIT_AUTOMAKE(shed,1.12)
+AC_PROG_CC
+AC_PROG_INSTALL
+CFLAGS="-Wall"
+AC_SUBST(CFLAGS)
+AC_ARG_ENABLE(debug,[  --enable-debug      -g],enable_debug=yes)
+if test "$enable_debug" = "yes" ; then
+  CFLAGS="$CFLAGS -g"
+fi
+ERR="Required package missing!"
+AC_CHECK_HEADER(ncurses.h,:,AC_MSG_ERROR([$ERR]))
+AC_CHECK_HEADER(getopt.h,:,AC_MSG_ERROR([$ERR]))
+AC_CHECK_LIB(ncurses,initscr)
+AC_CHECK_LIB(m,pow)
+AC_OUTPUT(Makefile)

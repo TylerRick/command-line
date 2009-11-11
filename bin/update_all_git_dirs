@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+for dir in "locate '.git'"; do
+  cd $dir
+  git pull
+do

@@ -1,0 +1,8 @@
+dirs:
+- '/home/tyler/Pictures/Wallpaper/3datadesign.com/3200x1200'
+- '/home/tyler/Pictures/Wallpaper/Digital Blasphemy/3200x1200'
+
+# Use true to use the default ('change_wallpaper.log') or specify the path to a log file
+log_file: true
+
+debug: true

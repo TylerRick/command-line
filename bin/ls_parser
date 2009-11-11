@@ -1,0 +1,72 @@
+#!/usr/bin/ruby
+
+#-------------------------------------------------------------------------------
+def usage
+  puts <<End
+ls_parser [--size] [--filename]
+End
+end
+
+#-------------------------------------------------------------------------------
+# To do / ideas
+# --md5sum option
+# Use "%size %filename" style to let people specify the *order* they want
+#   Never mind, I guess we could just respect the order of the --size/--filename options, which is what we do anyway
+
+#-------------------------------------------------------------------------------
+
+columns = [:permissions, :link_count, :owner, :group, :size, :date, :filename]
+LsLine = Struct.new(*columns)
+
+class LsParser
+  def initialize(input)
+    @input = input
+  end
+
+  def start
+    @input.lines.map do |line|
+      #drwx------ 2 tyler tyler 4096 2009-01-04 21:22 filename
+      #                            p    l     o     g   size     date             time      filename
+      if match = line.match(%r<^(\S+) (\d+) (\S+) (\S+) ([\d-]+) ([\d-]+|\S+ \d+) (\d+:\d+) (.+)$>)
+        #puts '-----------------------------------------'
+
+        l = LsLine.new
+        l.permissions, l.link_count, l.owner, l.group, l.size, date, time, l.filename = match.captures
+        l.date = "#{date} #{time}"
+      else
+        puts "Line was not in expected format: #{line}"
+      end
+      l
+    end.compact
+  end
+end
+
+
+#---------------------------------------------------------------------------------------------------
+
+@show = []
+
+require 'getoptlong'
+opts = GetoptLong.new(
+    [ '--size', '-s',                GetoptLong::NO_ARGUMENT ],
+    [ '--filename', '-f',              GetoptLong::NO_ARGUMENT ]
+)
+opts.each do | opt, arg |
+  case opt
+  when '--size', '-s'
+    @show << :size
+  when '--filename', '-f'
+    @show << :filename
+  end
+end
+
+if @show.empty?
+  usage; exit 1
+end
+
+#---------------------------------------------------------------------------------------------------
+
+lines = LsParser.new(STDIN.read).start
+lines.each do |line|
+  puts @show.map {|s| line.send s}.join(' ')
+end

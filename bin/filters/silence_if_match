@@ -1,0 +1,22 @@
+#!/usr/bin/ruby
+
+# Kind of grep but shows or doesn't show the entire input depending on whether there is a match rather than showing only matching (or non-matching if -v) *lines*.
+#
+# Example:
+# echo -e '1\nboring\n3' | silence_if_match '^bor\w+g'
+#
+# If you know the output of a job is useless (not worth reading) if it contains a certain string, you can pipe the output from it in your crontab to something like this:
+#   silence_if_match '0 ready to send'
+
+pattern = ARGV[0]
+input = STDIN.read
+match = input.lines.detect do |line|
+  line =~ /#{pattern}/
+end
+
+if match
+  # silence
+else
+  puts input 
+end
+

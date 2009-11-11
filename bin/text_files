@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+# Filter command
+# given as standard input: a list of filenames, one per line
+# output: a list of filenames (from the ones gives) that are plain ASCII text files (not binary)
+# Example: dos2unix will try to convert (and end up modifying) binary files such as images. Since this is not desirable and since it doesn't have any options for recursively fixing an entire directory tree, I have ended up doing this to accomplish that:
+# ffind '' . | text_files | xargs dos2unix
+
+require 'fileutils'
+require 'quality_extensions/file_test/binary_file'
+
+$stdin.each_line do |file|
+  file.chomp!
+  puts file if FileTest.text_file?(file)
+end
+  

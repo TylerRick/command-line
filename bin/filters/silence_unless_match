@@ -1,0 +1,26 @@
+#!/usr/bin/ruby
+
+# Kind of grep but shows or doesn't show the entire input depending on whether there is a match rather than showing only matching (or non-matching if -v) *lines*.
+#
+# Example:
+# If you only want to see output from your cron if there are warnings or errors, you might want to pipe the command through this:
+#   silence_unless_match 'warning|error'
+#
+# Example:
+# > echo -e '1\nwarning\n3' | silence_unless_match ^warning
+# 1
+# warning
+# 3
+
+pattern = ARGV[0]
+input = STDIN.read
+match = input.lines.detect do |line|
+  line =~ /#{pattern}/
+end
+
+unless match
+  # silence
+else
+  puts input 
+end
+

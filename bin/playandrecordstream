@@ -1,0 +1,125 @@
+#!/usr/bin/ruby
+require 'timeout'
+require 'quality_extensions/kernel/sleep_loudly'
+#require 'shell'
+
+#---------------------------------------------------------------------------------------------------
+rip_dir = '~/Audio/Streamripper'
+w = 4
+w2 = 13
+w3 = 5
+stream_url = ARGV[0] || ENV['music_url']
+action = ARGV[1] || ARGV[0]
+user_agent = 'mplayer'
+
+#---------------------------------------------------------------------------------------------------
+
+def kill
+  if (system('pgrep streamripper'); $?.success?)
+    puts "Killing existing streamripper process (#{`pgrep streamripper`})..."
+    system('reallykill `pgrep streamripper`')
+  end
+end
+
+def show_latest_log
+  system('tail_latest_in_dir log')
+  puts  # may have contained a \r without \n
+end
+
+#---------------------------------------------------------------------------------------------------
+
+Dir.chdir(File.expand_path(rip_dir))
+puts Dir.getwd
+#exit
+
+if action == 'stop'
+  kill
+  exit
+end
+
+state = :initial
+for i in (1..10)
+  puts '--------------------------------------------------------------------------------------------'
+  puts "State=#{state} (i=#{i})"
+
+  case state
+  when :initial
+    if (system('pgrep streamripper'); $?.success?)
+      system('netstat -lpn 2>/dev/null | grep 8000')
+      puts "streamripper process already running..."
+      system('psgrep streamripper')
+      state = :try_playing
+    else
+      puts "streamripper process not running; starting now..."
+      state = :restart_streamripper
+    end
+
+  when :restart_streamripper
+    kill
+    puts "Starting streamripper..."
+    system "streamripper #{stream_url} -u #{user_agent} -r > log/`now` &"
+    state = :try_playing
+    sleep_loudly 5
+
+  when :try_playing, :try_playing_again
+    puts 'Trying to play from local relay server'
+    before = Time.now
+    command = ('mplayer -prefer-ipv4 http://localhost:8000 2>&1')
+
+    # Take into account the case when both pgrep and netstat report that it's ready, but it still hasn't "warmed up" yet
+    # could pipe output and look for failed attempts to play/find server, but that might not work well (?) if mplayer is sucessful because mplayer outputs progress/status output continuously
+
+    #shell = Shell.new
+    # TODO: I wish I could simply get this in a StringIO -- maybe if I used popen instead? -- but for now:
+    #shell.system(command) | Shell.new.tee("/tmp/playmusicrelay.#{$$}") > STDOUT
+    system(command + "| tee /tmp/playmusicrelay.#{$$}")
+    #shell.check_point
+
+    show_latest_log
+
+    output = File.read("/tmp/playmusicrelay.#{$$}")
+    elapsed = Time.now - before
+
+    # If it exited too soon or it had output an error that indicates it timed out / gave up
+    if elapsed < w2 or output =~ /No stream found to handle url|Cannot sync MAD frame/
+      #if state == :try_playing
+      #  puts "Player appears to have timed out / exited prematurely. Will try playing again in #{w3} s (maybe it's still starting up) (or you can interrupt now)"
+      #  sleep w3
+      #  state = :try_playing_again
+      #else
+        puts "Player appears to have timed out / exited prematurely. Will try restarting streamripper..."
+        state = :restart_streamripper
+        sleep_loudly 3
+      #end
+      #state = :stupid # restart streamripper
+    else
+      puts 'Player exited. Assuming user killed it...'
+      break
+    end
+  end
+
+  #retry
+end # loop
+
+
+
+
+def check_port
+    #puts "Giving it #{w} s to warm up..."
+    state = begin
+      Timeout::timeout(w) {
+        loop do
+          system('netstat -lpn 2>/dev/null | grep 8000')
+          if $?.success?
+            puts "Relay server appears to be running and ready on port 8000"
+            break :ready
+          else
+            puts "Appears to *not* be ready on port 8000 yet"
+            sleep 1
+          end
+        end
+      }
+    rescue Timeout::Error
+      puts "Timed out!"
+    end
+end

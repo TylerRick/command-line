@@ -1,0 +1,4 @@
+#!/bin/bash -v
+#for dir in ext/*; do cd $dir; ruby extconf.rb; make; cd ../..; done
+mkdir lib/`ruby -e "puts RUBY_PLATFORM"`
+mv ext/*/*.so lib/`ruby -e "puts RUBY_PLATFORM"`

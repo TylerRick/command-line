@@ -1,0 +1,15 @@
+File locking - I naivly assumed that if a file is opened for
+writing, unix would lock it so other programs could not write
+to it. This does not appear to be the case.
+    
+There are other things that could be added, but I'm not
+really planning to, as it would start getting too complicated
+and this was only meant to be a quick-n-dirty editor.
+
+ - Replace
+ - Toggle whether file is treated as signed or unsigned chars.
+ - Create new files rather than just edit existing files.
+ - Alter size of file being edited (ie. insert/delete characters).
+ - Cut/Copy/Paste
+ - Undo
+ - Config (~/.shedrc) to set things like hex mode by default.m

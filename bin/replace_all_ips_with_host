@@ -1,0 +1,37 @@
+#!/usr/bin/ruby
+# a filter/pipeline command
+
+def usage
+  puts <<End
+Usage: stdin | replace_all_ips_with_host
+
+Does a reverse DNS lookup for each IP in the stdin stream.
+
+Replaces IP address with the hostname if ARGV[0] == 'replace'; otherwise, puts it in parentheses following the IP address.
+
+Example:
+/bin/egrep 'ssh.*(Accepted|opened)' /var/log/auth.log | replace_all_ips_with_host
+End
+  exit
+end
+
+usage if ARGV[0] == '-h'
+replace_or_append = ARGV[0] == 'replace' ? :replace : :append
+
+#---------------------------------------------------------------------------------------------------
+
+lines = STDIN.lines.map do |line|
+  ips = line.scan(/\d+\.\d+\.\d+\.\d+/)
+  ips.each do |ip|
+    hostname = `host #{ip}`.chomp
+    hostname = $1 if hostname =~ / ([^ ]+$)/
+    if replace_or_append == :replace
+      line = line.sub(ip, hostname)
+    else
+      line = line.sub(ip, "#{ip} (#{hostname})")
+    end
+  end
+  line
+end
+puts lines.join
+

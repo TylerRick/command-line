@@ -1,0 +1,4 @@
+#!/bin/sh
+# Usage: is_binary $filename && echo "$filename is binary"
+file "$1" | grep -Fq ASCII 
+exit $?
