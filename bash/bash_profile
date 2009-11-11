@@ -1,0 +1,85 @@
+# This file is sourced by bash when you log in *interactively*.
+
+[ -f ~/.bashrc ] && . ~/.bashrc
+
+#---------------------------------------------------------------------------------------------------
+# So that Home and End will work instead of outputting H or F
+export TERM=xterm
+
+#---------------------------------------------------------------------------------------------------
+#PROMPTING
+#       When  executing  interactively, bash displays the primary prompt PS1 when it is ready to read a command, and the secondary prompt PS2 when it needs more input to com‐
+#       plete a command.  Bash allows these prompt strings to be customized by inserting a number of backslash-escaped special characters that are decoded as follows:
+#              \a     an ASCII bell character (07)
+#              \d     the date in "Weekday Month Date" format (e.g., "Tue May 26")
+#              \D{format}
+#                     the format is passed to strftime(3) and the result is inserted into the prompt string; an empty format results in a locale-specific time representation.
+#                     The braces are required
+#              \e     an ASCII escape character (033)
+#              \h     the hostname up to the first ‘.’
+#              \H     the hostname
+#              \j     the number of jobs currently managed by the shell
+#              \l     the basename of the shell’s terminal device name
+#              \n     newline
+#              \r     carriage return
+#              \s     the name of the shell, the basename of $0 (the portion following the final slash)
+#              \t     the current time in 24-hour HH:MM:SS format
+#              \T     the current time in 12-hour HH:MM:SS format
+#              \@     the current time in 12-hour am/pm format
+#              \A     the current time in 24-hour HH:MM format
+#              \u     the username of the current user
+#              \v     the version of bash (e.g., 2.00)
+#              \V     the release of bash, version + patch level (e.g., 2.00.0)
+#              \w     the current working directory, with $HOME abbreviated with a tilde
+#              \W     the basename of the current working directory, with $HOME abbreviated with a tilde
+#              \!     the history number of this command
+#              \#     the command number of this command
+#              \$     if the effective UID is 0, a #, otherwise a $
+#              \nnn   the character corresponding to the octal number nnn
+#              \\     a backslash
+#              \[     begin a sequence of non-printing characters, which could be used to embed a terminal control sequence into the prompt
+#              \]     end a sequence of non-printing characters
+#
+
+#export PS1='\[\033[01;35m\]$(date +%H:%M) \[\033[00;33m\]\w\[\033[01;34m\] > \[\033[00m\]'
+
+# to do: rewrite this/these using ruby colored gem so I can just say:
+# user.green.bold + '@' + host.green + '...'
+# def user; '\u'; end
+# def host; '\h'; end
+# def path; '\w'; end
+# def git_branch; ...; end
+
+# [host: /home/htdocs]>
+#export PS1='\[\033[0;33m\][\[\033[0;36m\]\h\[\033[0;33m\]:\[\033[0;36m\] \w\[\033[0;33m\]]>\[\033[0m\] '
+
+# user: /home/htdocs >
+#export PS1="\n"'\[\033[0;36m\]\u\[\033[0;33m\]:\[\033[0;36m\] \w\[\033[0;33m\] >\[\033[0m\] '
+
+#with git branch:
+#export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;36m\] \w$(git branch &>/dev/null; if [ $? -eq 0 ]; then echo "($(git branch | grep '^*' |sed s/\*\ //))"; fi)\[\033[00m\]\$ '
+time='\t'
+user_and_host='\[\033[01;32m\]\u\[\033[00m\]\[\033[32m\]@\h\[\033[00m\]:\[\033[01;36m\]'
+path='\w'
+git_branch='\[\033[0;36m\]$(git branch &>/dev/null; if [ $? -eq 0 ]; then echo " ($(git-current-branch))"; fi)'
+export PS1="\n$time $user_and_host $path$git_branch \[\033[00m\]> "
+
+
+alias demo_mode='PS1="\n> "'
+
+#---------------------------------------------------------------------------------------------------
+LS_COLORS='no=00:fi=00:di=01;34:ln=01;36:pi=40;33:so=01;35:bd=40;33;01:cd=40;33;01:or=01;05;37;41:mi=01;05;37;41:ex=01;32:*.cmd=01;32:*.exe=01;32:*.com=01;32:*.btm=01;32:*.bat=01;32:*.sh=01;32:*.csh=01;32:*.tar=01;31:*.tgz=01;31:*.arj=01;31:*.taz=01;31:*.lzh=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.gz=01;31:*.bz2=01;31:*.bz=01;31:*.tz=01;31:*.rpm=01;31:*.cpio=01;31:*.jpg=01;35:*.gif=01;35:*.bmp=01;35:*.xbm=01;35:*.xpm=01;35:*.png=01;35:*.tif=01;35:';
+export LS_COLORS
+
+#---------------------------------------------------------------------------------------------------
+#. ~/.ssh-agent
+#SSHAGENT=/usr/bin/ssh-agent
+#SSHAGENTARGS="-s" 
+#	# -s      Generate Bourne shell commands on stdout.  This is the default if SHELL does not look like it's a csh style of shell.
+#if [ -z "$SSH_AUTH_SOCK" -a -x "$SSHAGENT" ]; then
+#	eval `$SSHAGENT $SSHAGENTARGS`
+#	trap "kill $SSH_AGENT_PID" 0
+#fi
+
+# Then to use it, type:
+# 	ssh-add -t 15300"

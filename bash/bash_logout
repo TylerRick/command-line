@@ -1,0 +1,20 @@
+# To install:
+#source ~/public/shell/bash/bash_logout
+
+# Tip: .bash_logout is *only* executed when you exit a *login* shell -- *not* for "normal" interactive shells. I don't know how to hook into the 
+# logout/exit event of normal interactive shells (anyone?). Since by default (in my Ubuntu/GNOME setup anyway), starting a new terminal window
+# will start a normal interactive shell and not a login shell, this means this file will seldom be used unless you do something to workaround
+# this default behavior!
+# You can force bash to start as a login shell by passing --login. In Ubuntu, I changed my Main Menu's gnome-terminal's Launcher's command line
+# from "gnome-terminal" to "gnome-terminal --execute bash --login". Now *all* of my terminals/shells are "login shells" (is that bad?).
+# (http://forums.fedoraforum.org/showthread.php?t=2889)
+
+mkdir -p ~/backups/bash_history/
+cp $HISTFILE ~/backups/bash_history/`date +%Y%m%dT%H%M`
+
+echo '#----------------------------------------------------------------------------------------------------' >> $HISTFILE
+echo "# At `date +%Y%m%dT%H%M`, the following login shell session ended and its command history was appended to this file: " >> $HISTFILE
+# Those commands get appended *after* this is run, so we can only prefix them, not postfix them. As a result, we won't necessarily know where
+# they end, because it is possible for another shell (an interactive non-login shell) to append te $HISTFILE without calling this script
+# to timestamp and delimit the start of that session. So it may appear that those commands were part of the one we are prefixing right
+# here when in reality they are part of a separate session.

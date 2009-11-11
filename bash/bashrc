@@ -1,0 +1,356 @@
+#!/bin/bash
+# ~/dev/git/tyler-git/sh/git_commands
+# This file is sourced by all interactive bash shells on startup.  This
+# file *should generate no output* or it will break the scp and rcp commands.
+
+
+#---------------------------------------------------------------------------------------------------
+# Paths
+
+# todo: only add paths that aren't already there, so that it's safe to source this file multiple times
+export PATH=\
+~/bin:\
+~/bin/macros:\
+~/public/shell/bin:\
+~/public/shell/bin/ruby:\
+~/public/shell/bin/rails:\
+~/public/shell/bin/filters:\
+~/public/shell/devscripts_bin/:\
+~/public/ruby/bin:\
+$PATH
+
+. paths.d.parse
+
+#if doesn't already include it:
+  export PATH=$PATH:`gem env gemdir`/bin
+#fi
+
+# Lets me use the development version from the SCM instead of having to install a gem
+export RUBYLIB=$RUBYLIB:$HOME/dev/git/ruby-git/lib
+
+export RUBYOPT=rubygems
+
+#---------------------------------------------------------------------------------------------------
+# Variables
+
+export EDITOR=/usr/bin/vim
+export VISUAL=$EDITOR
+
+#---------------------------------------------------------------------------------------------------
+# Aliases
+
+alias xargs1='xargs -n1 -I{}'
+
+alias dpkg-listfiles='dpkg --listfiles'
+alias receive-ppa-key='sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys'
+
+# example:
+#    /usr/lib/ruby/gems/1.8/gems/capistrano-2.5.0/lib  > cppa ./capistrano/configuration/actions/inspect.rb ~/public/examples/ruby/input_ouput/
+# Is *much* shorter than:
+#    mkdir -p ~/public/examples/ruby/input_ouput/capistrano/configuration/actions/
+#    cp ./capistrano/configuration/actions/inspect.rb ~/public/examples/ruby/input_ouput/capistrano/configuration/actions/
+alias cppa='cp --parents'
+
+alias vimo='vimopen'
+
+#alias inst='sudo apt-get install'
+# Unfortunately, this doesn't work, so I moved this command wrapper into a shell script
+#alias inst='echo "sudo apt-get install" $1; sudo apt-get install $1'
+alias uninst='sudo apt-get remove $1'
+alias ginst='sudo gem install --no-rdoc'
+alias ginst1.8='sudo gem1.8 install --no-rdoc'
+alias guninst='sudo gem uninstall'
+
+alias useruby1.9='sudo ln -sf ruby1.9.1 /usr/bin/ruby'
+alias useruby1.8='sudo ln -sf ruby1.8 /usr/bin/ruby'
+
+alias asbob='sudo -u bob'
+
+alias mozrepl='rlwrap telnet localhost 4242'
+
+#------------------------------------------
+# git
+source ~/dev/git/tyler-git/sh/git_commands
+
+#------------------------------------------
+# svn
+
+alias s="svn"
+alias svnlog5="svn log --limit 5"
+alias svnlog10="svn log --limit 10"
+alias svnlog20="svn log --limit 20"
+alias svnlog30="svn log --limit 30"
+alias ss="svn status"
+alias ssu="svn status -u"
+#alias svndiff="svn_diff_color"
+alias svndiff="svn diff"
+alias sd="svndiff"
+alias sc="svn commit"
+alias sup="svn update"
+alias scq="svn commit -m ''"	# svn commit quick
+alias scqc='scq --covert'	    # quickly and covertly
+alias diff="colordiff"
+
+# svn scripts
+#alias ua='update_all'
+#alias sa='svn_status_all'
+
+#------------------------------------------
+
+# Grep
+alias grep='grep --color'
+alias g='grep'
+
+#------------------------------------------
+# Dirs
+#alias d='dirs -v'
+#alias dir='dirs +'		# Use an index # as reported by dirs -v
+#unset -f d
+#export -f d
+function d {
+  if [[ "" == "$1" ]]; then
+	dirs -v
+  else
+	echo `dirs +$1`
+	cd `dirs +$1`
+	pwd
+  fi
+}
+alias d='source ~/dev/shell/bash-dirs.sh' 
+#alias pd='eval pushd '		# Doesn't work
+alias pd='pushd'
+alias p='popd'
+alias n='nautilus . &'
+
+#------------------------------------------
+# Jobs
+alias j='jobs'
+
+alias f='fg'
+alias 1='fg 1'
+alias 2='fg 2'
+alias 3='fg 3'
+alias 4='fg 4'
+alias 5='fg 5'
+alias 6='fg 6'
+alias 7='fg 7'
+alias 8='fg 8'
+alias 9='fg 9'
+alias 10='fg 10'
+alias 11='fg 11'
+alias 12='fg 12'
+alias 13='fg 13'
+alias 14='fg 14'
+alias 15='fg 15'
+alias 16='fg 16'
+alias f1='fg 1'
+alias f2='fg 2'
+alias f3='fg 3'
+alias f4='fg 4'
+alias f5='fg 5'
+alias f6='fg 6'
+alias f7='fg 7'
+alias f8='fg 8'
+alias f9='fg 9'
+
+#------------------------------------------
+# Processes
+alias ps='ps uf'		# Everything for this user. Forest.
+
+#------------------------------------------
+# Kill
+alias k9='kill -9'
+
+#------------------------------------------
+# Command history
+alias hist='history'	# Slightly shorter to type.
+alias his='history'
+alias hi='history'
+alias h='history 50'	# Show about a page worth of history. This is what I'll want to do most of the time.
+alias h200='history 200'
+alias hgrep='history|grep '	# List all command lines containing the search term.
+alias hgrep2='cat ~/.bash_history|grep '	# use full history
+function hgrep3 {
+  # use backups of full history
+	cgrep "$1" ~/backups/bash_history/
+}
+
+# TODO: hg-menu: let you choose history item with arrow keys
+# TODO: hg-menu: let you choose history item with arrow keys
+#alias hg='history|grep '
+alias hgc='history|grep -C5' # If you are trying to recall a command but all you remember is that it was before or after some other command, you can search for the other command and look at the context lines above or below
+
+#------------------------------------------
+# ls
+
+#       -F, --classify
+#              append indicator (one of */=>@|) to entries
+#
+#       -p, --indicator-style=slash
+#              append / indicator to directories
+#
+#       -A, --almost-all
+#              do not list implied . and ..
+#
+#       --color[=WHEN]
+#              control  whether  color is used to distinguish file types.  WHEN
+#              may be `never', `always', or `auto'
+#
+alias l="ls -p --color=auto -1"
+
+#       -l     use a long listing format
+#
+alias ll="l -Al"
+
+#alias ls="l"
+#alias lla="ls --color -la"
+
+#------------------------------------------
+
+# This lets you change directories and list the contents of the directory you just changed into in
+# one command.
+alias cdl='source ~/public/shell/bin/cdl.sh' 
+alias cdd='cdl'
+
+alias mkdircd='source ~/public/shell/bin/mkdircd' 
+#alias     mdc='source ~/public/shell/bin/mkdircd' 
+alias     cdf='source ~/public/shell/bin/mkdircd' # "cd --force" :)
+
+
+#------------------------------------------
+alias dum='du --max-depth=1 | sort -rg'
+alias dum2='find . -maxdepth 1 -exec du -ks {} \; | sort -rn | head -n 30'
+
+
+#---------------------------------------------------------------------------------------------------
+# Gems
+
+if [ -d /var/lib/gems/1.8/gems/ ]; then
+    alias cdgems='pushd /var/lib/gems/1.8/gems/'
+fi
+if [ -d /usr/lib/ruby/gems/1.8/gems/ ]; then
+    alias cdgems='pushd /usr/lib/ruby/gems/1.8/gems/'
+fi
+
+
+function pushdgem {
+  path=`gem_dir_of $1`
+  #echo $path
+  if [ ! -z "$path" ]; then
+    pushd $path
+  fi
+}
+alias cdgem=pushdgem
+alias pdgem=pushdgem
+
+#function cdgem {
+#  path=`gem which $1 2>/dev/null | tail -n1`
+   # echo path=$path
+#  basename $path
+#  file=`basename $path`
+#  path=`dirname $path`
+   # echo path=$path
+#  pushd $path
+#  cat $file
+#}
+
+
+
+#------------------------------------------
+# Vim
+alias vi='vim'
+
+function pushdwhich {
+  path=`which $1`
+  if [ ! -z "$path" ]; then
+    if [ -f "$path" ]; then # True if file exists and is a regular file.
+      path=`dirname $path`
+    fi
+	#echo $path
+    pushd $path
+  fi
+}
+alias cdwhich=pushdwhich
+alias pdwhich=pushdwhich
+
+#alias lwhich='ls -al \`which\`'
+function lwhich {
+	which $1
+	ls -al `which $1`
+}
+
+#alias vimwhich='vim \`which '
+function vimwhich {
+	which $1
+	vim `which $1`
+}
+
+function vimgemwhich {
+	gem which $1
+	vim `gem which -q $1`
+}
+
+#------------------------------------------
+# Aliases for bash config files
+alias bashprofile=' vim ~/.bash_profile;                  source ~/.bash_profile'
+alias bashprofilep='vim ~/public/shell/bash/bash_profile; source ~/.bash_profile'
+alias bashrc='     vim ~/.bashrc;                  source ~/.bash_profile'
+alias bashrcp='    vim ~/public/shell/bash/bashrc; source ~/.bash_profile'
+
+#alias cdfses='cd ~/.mozilla/firefox/Tyler/sessions; ll -t'
+alias cdfses='cd ~/.mozilla/firefox/Tyler/sessions; firefox_session_list'
+
+#---------------------------------------------------------------------------------------------------
+# sudo
+
+# https://bugs.launchpad.net/ubuntu/+source/sudo/+bug/50797/
+# sudo with aliases and path
+# The only problem with this (and the reason I namespaced it 'asudo' and left the plain 'sudo' unaliased) is that it doesn't seem to work with the NOPASSWD commands I have in my sudoers. It prompts me for a password even when using the alias, but doesn't when I use plain sudo.
+alias asudo='sudo env PATH="$PATH" '
+
+# TODO: make a wrapper function/command for sudo that expands each command that is an argument to sudo
+# so command 'a' would be replaced with its full path (/path/to/a) so that it would still work even if not in the path that sudo uses
+# and if there is an alias defined with name 'a', then it would be replaced here with its expansion
+# Never mind, this trick seems to work:
+# http://ubuntuforums.org/showthread.php?t=217188
+# alias sudo='A=`alias` sudo  '
+
+#alias sudo='A=`alias`; sudo env PATH="$PATH"'
+
+#alias sudo='A=`alias; alias rm='rm -i'; alias cp='cp -i'; alias mv='mv -i'`; sudo env PATH="$PATH"'
+
+#alias sudo='A=`alias; alias rm='rm -i'`; sudo env PATH="$PATH"'
+#-bash: alias: `-i; alias cp': invalid alias name
+
+#alias sudo='A="alias ll='"'"'ls -a'"'"'" sudo env PATH="$PATH"'
+#alias sudo='A="alias l" sudo env PATH="$PATH"'
+#alias sudo='A="alias l" sudo env PATH="$PATH"'
+
+#---------------------------------------------------------------------------------------------------
+# Window title
+
+case $TERM in
+	# When I ssh with PuTTY, $TERM is usually "xterm".
+	xterm*|rxvt|Eterm|eterm)
+
+		PROMPT_COMMAND='echo -ne "\033]0;${USER}@${HOSTNAME%%.*}:${PWD/$HOME/~}\007"'
+		;;
+	# Change the window title of X terminals 
+	screen)
+		PROMPT_COMMAND='echo -ne "\033_${USER}@${HOSTNAME%%.*}:${PWD/$HOME/~}\033\\"'
+		;;
+esac
+
+#---------------------------------------------------------------------------------------------------
+# Command history
+
+shopt -s histappend
+export HISTFILESIZE=100000
+export HISTSIZE=10000
+
+#---------------------------------------------------------------------------------------------------
+
+
+#---------------------------------------------------------------------------------------------------
+# Colors for ls, etc.
+#eval `dircolors -b /etc/DIR_COLORS`
