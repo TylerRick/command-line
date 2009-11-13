@@ -1,0 +1,56 @@
+#!/usr/bin/ruby
+
+#---------------------------------------------------------------------------------------------------
+def usage
+  puts <<End
+Usage: #{File.basename(__FILE__)} [options] dir 
+End
+  exit
+end
+
+usage if ARGV.size < 1
+
+#---------------------------------------------------------------------------------------------------
+# Parse options
+
+base_dir = ARGV[0]
+
+options = {
+  :compare_files        => true, # useful to fix things that html2haml misses, like:
+    # *the contents of 'form_for do' and 'if' are not indented as they should be (and the useless '- end' is retained)
+    # *the contents of my multi-line sections (<%= %>)/tags (javascript_tag, etc.) blocks are all stripped of newlines and put on a single line (which I then have to undo and add | continuation lines
+    # (and \n at the end of comment lines, since internally HAML still strips newlines, for some reason!!!)
+    # *blank lines you want to keep are thrown away
+  :delete_after_compare => true,
+}
+
+#---------------------------------------------------------------------------------------------------
+# Main
+require 'pathname'
+
+class HtmlErbToHaml
+  def initialize(file, options)
+    @file = file
+    @options = options
+  end
+  
+  def convert
+    file = @file
+    outfile = file.
+              gsub(/\.erb$/, '.haml').
+              gsub(/\.rhtml$/, '.html.haml')
+    if Pathname.new(outfile).exist?
+      puts "#{outfile} already exists! Skipping..."
+    else
+      system %(html2haml -rx #{file} #{outfile})
+      system %(vim -O #{file} #{outfile})  if @options[:compare_files]
+      system %(rm #{file})                 if @options[:delete_after_compare]
+    end
+  end
+end
+
+# or .rhtml
+Dir["#{base_dir}/**/*.{erb,rhtml}"].each do |file|
+  HtmlErbToHaml.new(file, options).convert
+end
+
