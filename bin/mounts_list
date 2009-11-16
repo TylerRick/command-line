@@ -23,7 +23,8 @@ def usage
   puts <<End
 Options:
   -d, --device -- groups by device, and shows model name/serial number/disk capacity of each physical device
-    Warning: This currently attempts to run fdisk -l and hdparm -i with sudo, which may prompt for a password.
+
+    Warning: This currently attempts to run blkid, fdisk -l, and hdparm -i with sudo, which may prompt for a password.
     Presently this command will not pass on the password prompt to you but will just sit there.
     It is recommended that you add those commands to your sudoers file with NOPASSWD so that it won't prompt for a password.
 
@@ -129,7 +130,8 @@ class BlkidParser
   end
 
   def run_command
-    `blkid`.chomp
+    # blkid (without sudo) gives no output at all until I've run sudo blkid at least once. After that, I can run blkid without sudo and get the same output (it must cache it).
+    `sudo blkid`.chomp
   end
 
   def parse
@@ -288,6 +290,10 @@ class Partition
 end
 
 #---------------------------------------------------------------------------------------------------
+
+# Defaults
+@show_device_info = true
+@group_by_device  = true
 
 require 'getoptlong'
 #require 'optparse'
