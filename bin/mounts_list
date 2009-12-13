@@ -5,12 +5,13 @@
 # * mounts_list is too long!
 
 # To do:
+# * Don't pad the last column with space (or if we do, make sure the space comes *after* the color, so that strip works)
 # * Switch to optparse
 # * Also show output from parted -l (way too slow), hddtemp, smartctl, tune2fs (% of reserved space)
 # * Compare mounted drives to list from fdisk and give warning if any drives exist that aren't mounted
 # * Find out and use what the standard name is for referring to a physical disk (physical_disk) and a partition on the device (disk)
 #   * Is 'volume' preferable to disk or partition?
-#   * I've been using 'Disk' generically in DfParser::Disk, etc.
+#   * I've been using 'Partition' generically in DfParser::Partition, etc.
 # * Add options for customization:
 #   * List columns to show with --columns
 #   * Allow user to customize thresholds used by colorize_percent(s)
@@ -36,12 +37,13 @@ end
 #-------------------------------------------------------------------------------
 require 'ostruct'
 require 'pathname'
-require 'rubygems' 
+require 'rubygems'
 require 'facets'
 require 'colored'
 require 'facets/blank'
 require 'facets/array/delete_values'
 require 'facets/symbol/to_proc'
+require 'facets/class/cattr_accessor'
 require 'quality_extensions/string/with_knowledge_of_color'
 require 'quality_extensions/safe_nil'
 require 'quality_extensions/helpers/numbers'
@@ -49,7 +51,7 @@ require 'quality_extensions/helpers/numbers'
 #-------------------------------------------------------------------------------
 # duplication with files_of_hanoi
 
-partition_columns     = [:device_path, :mount_path, :file_system_type, :mount_options, :dump, :pass, :capacity, :capacity_binary, :space_free, :space_free_binary, :percent_full, :label, :uuid]
+partition_columns     = [:device_path, :mount_path, :file_system_type, :mount_options, :dump, :pass, :capacity, :capacity_binary, :space_free, :space_free_binary, :percent_full, :label, :uuid, :boot, :start, :end, :blocks]
 physical_disk_columns = [:device_path, :device_info, :physical_capacity, :physical_capacity_binary]
 columns = partition_columns | physical_disk_columns
 
@@ -59,9 +61,112 @@ PhysicalDisk = Struct.new(*physical_disk_columns)
 $columns_to_show = columns
 $columns_to_show.delete_values(:mount_options, :dump, :pass)
 
+# TODO: I want it to have attributes of both Hash ([] to access by device_path) and Array (each yields elements (disk objects) directly, not (key,value))
+class DiskList < Array
+  def initialize
+    raise "#{self.class.name} is an abstract class and cannot be instantiated" if self.class.name =~ /(^|::)DiskList$/
+  end
+
+  def [](sought)
+    find {|disk|
+      disk.device_path == sought #or
+      #disk.respond_to?(:mount_path) && disk.mount_path == sought
+    }
+  end
+  def []=(device_path, new)
+    #puts "device_path=#{device_path}, new=#{new}"
+    if self[device_path]
+      self[device_path]
+    else
+      if new.device_path.nil?
+        new.device_path = device_path
+      else
+        raise "#{device_path} != #{new.device_path}"
+      end
+      self << new
+      new
+    end
+  end
+
+  def to_s
+    "#{self.class.name}#{super}"
+  end
+
+  def inspect
+    "#{self.class.name}#{super}"
+  end
+end
+
+# aggregator, merges/combines data from different sources
+class PartitionList < DiskList
+  # def merge(other)
+  # def <<(other)
+  def +(other)
+#    p self
+#    p other
+#    exit
+    case other
+
+    when MtabParser::PartitionList
+      other.each do |mtab|
+        disk = self[mtab.device_path] ||= Partition.new
+        disk.mount_path       = mtab.mount_path
+        disk.file_system_type = mtab.file_system_type
+        disk.mount_options    = mtab.mount_options
+        disk.dump             = mtab.dump
+        disk.pass             = mtab.pass
+      end
+
+    when DfParser::PartitionList
+      other.each do |df|
+        disk = self[df.device_path] ||= Partition.new
+        disk.capacity                  = "#{number_to_human_size(df._?.capacity)}"
+        disk.capacity_binary           = "#{number_to_human_size(df._?.capacity, :base => 2)}"
+        disk.space_free                = "#{number_to_human_size(df._?.space_free)}"
+        disk.space_free_binary         = "#{number_to_human_size(df._?.space_free, :base => 2)}"
+        disk.percent_full              = df._?.percent_full
+      end
+
+    when FdiskParser::PartitionList
+      other.each do |fdisk|
+        disk = self[fdisk.device_path] ||= Partition.new
+        disk.device_path  , disk.boot  , disk.start  , disk.end  , disk.blocks  , disk.file_system_type =
+        fdisk.device_path , fdisk.boot , fdisk.start , fdisk.end , fdisk.blocks , fdisk.file_system_type
+      end
+
+    else
+      raise "Don't know how to add objects of class #{other.class}"
+    end
+    self
+  end
+end
+
+class PhysicalDiskList < DiskList
+  # def merge(other)
+  # def <<(other)
+  def +(other)
+    case other
+
+    when FdiskParser::PhysicalDiskList
+      other.each do |fdisk_disk|
+        disk = self[fdisk_disk.device_path] ||= PhysicalDisk.new
+        disk.physical_capacity        = "#{number_to_human_size(fdisk_disk.physical_capacity)}"
+        disk.physical_capacity_binary = "#{number_to_human_size(fdisk_disk.physical_capacity, :base => 2)}"
+      end
+
+    else
+      raise "Don't know how to add objects of class #{other.class}"
+    end
+    self
+  end
+end
+
 class MtabParser
-  def initialize(mtab_path)
+  class PartitionList < ::PartitionList; end
+
+  def initialize(mtab_path = '/etc/mtab')
     @mtab_path = mtab_path
+    @disks = PartitionList.new
   end
 
   def parse
@@ -75,24 +180,24 @@ class MtabParser
           device_path_or_uuid, d.mount_path, d.file_system_type, d.mount_options, d.dump, d.pass = match.captures
           if device_path_or_uuid =~ %r<^(/dev/\S+)>
             d.device_path = $1
-            #puts d.device_path
+            @disks << d
           else
             raise "Expected device_path_or_uuid"
           end
         end
-        d
       end
-    end.compact.sort_by(&:device_path)
+    end
+    @disks
   end
 end
 
 class DfParser
-  class Disk < OpenStruct
-  end
+  class PartitionList < ::PartitionList; end
+  #class Partition < ::Partition; end
 
   def initialize(command_output = run_command)
     @command_output = command_output
-    @disks = {}
+    @disks = PartitionList.new
   end
 
   def run_command
@@ -102,31 +207,30 @@ class DfParser
 
   def parse
     @command_output.lines.each do |line|
-      disk = Disk.new
-
       # An actual df line
       # We're currently only looking for those with device_paths starting with '/'
       # Example line: /dev/sde1             1.4T  233G  1.2T  17% /media/1.5
       if match = line.match(%r<^(/\S+)\s+(\d+#{@block_size})\s+(\d+#{@block_size})\s+(\d+#{@block_size})\s+(\S+)\s+(\S+)\s*$>)
+        disk = Partition.new
         disk.device_path, disk.capacity, ignore, disk.space_free, disk.percent_full, disk.mount_path = match.captures
         disk.capacity, disk.space_free = disk.capacity.to_i * 1000, disk.space_free.to_i * 1000
+        @disks << disk if disk.device_path && disk.mount_path
       else
         #puts "Line didn't match pattern: #{line}"
       end
 
-      @disks[disk.mount_path] = disk if disk.mount_path
     end
     @disks
   end
 end
 
 class BlkidParser
-  class Disk < OpenStruct
-  end
+  class PartitionList < ::PartitionList; end
+  class Partition < ::Partition; end
 
   def initialize(command_output = run_command)
     @command_output = command_output
-    @disks = {}
+    @disks = PartitionList.new
   end
 
   def run_command
@@ -137,7 +241,7 @@ class BlkidParser
   def parse
     @command_output.lines.each do |line|
       #puts line
-      disk = Disk.new
+      disk = Partition.new
 
       # Example line: /dev/sda1: UUID="b0f7fce7-226a-4990-8798-a4e7feb373d2" TYPE="ext3"
       # TODO: why does this only capture the last occurence, as in TYPE="ext3" and fail to capture the UUID= part?
@@ -145,23 +249,26 @@ class BlkidParser
         disk.device_path = match.captures[0]
         line.scan(/(LABEL|UUID|SEC_TYPE|TYPE)="([^"]+)" ?/) do |captures|
           key, value = captures
-          disk.send("#{key.downcase}=", value)
+          disk.send("#{key.downcase}=", value) if disk.respond_to?(key.downcase)
         end
       end
 
-      @disks[disk.device_path] = disk if disk.device_path
+      @disks << disk if disk.device_path
     end
     @disks
   end
 end
 
 class FdiskParser
-  class Disk < OpenStruct
-  end
+  class PartitionList    < ::PartitionList; end
+  class PhysicalDiskList < ::PhysicalDiskList; end
+  #class Partition        < ::Partition; end
+  #class PhysicalDisk     < ::PhysicalDisk; end
 
   def initialize(command_output = run_command)
     @command_output = command_output
-    @disks = {}
+    @physical_disks = PhysicalDiskList.new
+    @partitions = PartitionList.new
   end
 
   def run_command
@@ -170,17 +277,26 @@ class FdiskParser
 
   def parse
     @command_output.lines.each do |line|
-      disk = Disk.new
 
       # Example line: Disk /dev/sde: 1500.3 GB, 1500301910016 bytes
       if match = line.match(%r<^Disk (/\S+): (\S+ \S+), (\d+) bytes.*$>)
+        disk = PhysicalDisk.new
         disk.device_path, ignore, disk.physical_capacity = match.captures
         disk.physical_capacity = disk.physical_capacity.to_i
+        @physical_disks << disk if disk.device_path
       end
 
-      @disks[disk.device_path] = disk if disk.device_path
+      # Example line: /dev/sda1   *           1        9763    78421266   83  Linux
+      if match = line.match(%r<(^/dev/\S+)\s+(\*?)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.+)$>)
+        disk = Partition.new
+        disk.device_path, disk.boot, disk.start, disk.end, disk.blocks, id, disk.file_system_type = match.captures
+        disk.boot = disk.boot == '*'
+        @partitions << disk if disk.device_path
+      end
+
     end
-    @disks
+    @physical_disks
+    [@physical_disks, @partitions]
   end
 end
 
@@ -199,8 +315,8 @@ class HdparmParser
         d.model, d.firmware_revision, d.serial_num = match.captures.map(&:strip)
       end
     end
-    raise "Could not get model from hdparm. Output=#{@output}" if d.model.nil?
-    d
+    p "Could not get model from hdparm. Output=#{@output}" if d.model.nil?
+    d unless d.model.nil?
   end
 end
 
@@ -211,6 +327,7 @@ end
 
 class Partition
   @@physical_disks = {}
+  cattr_accessor :physical_disks
 
   def physical_disk_path
     device_path.gsub(/\d+/, '')
@@ -243,7 +360,7 @@ class Partition
       :space_free_binary => 'Free',
       :capacity_binary   => 'Size',
       :percent_full      => 'Full',
-      :file_system_type  => 'FS',
+      :file_system_type  => 'Type',
       :mount_options     => 'Mount opts',
       :uuid              => 'UUID',
       :label             => 'Label',
@@ -251,33 +368,35 @@ class Partition
   end
 
   def self.column_headers(widths = Hash.new(0))
-     labels[:device_path].        underline.ljust_with_color(widths[:device_path]).cyan                 + ' '        +
-     labels[:mount_path].         underline.ljust_with_color(widths[:mount_path]).green                 + ' '        +
-     labels[:space_free].         underline.rjust_with_color(widths[:space_free]).cyan                  + '/'        +
-     labels[:capacity].           underline.rjust_with_color(widths[:capacity]).magenta                 + ' '        +
-     (labels[:space_free_binary]. underline.rjust_with_color(widths[:space_free_binary]).cyan           + '/' if $columns_to_show.include?(:space_free_binary)).to_s +
-     (labels[:capacity_binary].   underline.rjust_with_color(widths[:capacity_binary]).magenta          + ' ' if $columns_to_show.include?(:capacity_binary)).to_s +
-     labels[:percent_full].       underline.rjust_with_color(widths[:percent_full]).green               + ' '        +
-     labels[:file_system_type].   underline.ljust_with_color(widths[:file_system_type]).magenta         + ' '        +
-     (labels[:mount_options].     underline.ljust_with_color(widths[:mount_options] + 2).magenta        + ' ' if $columns_to_show.include?(:mount_options)).to_s +
-     labels[:uuid].               underline.ljust_with_color(widths[:uuid]).green                       + ' '        +
-     labels[:label].              underline.ljust_with_color(widths[:label]).cyan                       + ' '        +
-     ''
+    labels[:device_path].        underline.ljust_with_color(widths[:device_path]).cyan                 + ' '        +
+    labels[:mount_path].         underline.ljust_with_color(widths[:mount_path]).green                 + ' '        +
+    labels[:file_system_type].   underline.ljust_with_color(widths[:file_system_type]).magenta         + ' '        +
+    labels[:space_free].         underline.rjust_with_color(widths[:space_free]).cyan                  + '/'        +
+    labels[:capacity].           underline.rjust_with_color(widths[:capacity]).magenta                 + ' '        +
+    (labels[:space_free_binary]. underline.rjust_with_color(widths[:space_free_binary]).cyan           + '/' if $columns_to_show.include?(:space_free_binary)).to_s +
+    (labels[:capacity_binary].   underline.rjust_with_color(widths[:capacity_binary]).magenta          + ' ' if $columns_to_show.include?(:capacity_binary)).to_s +
+    labels[:percent_full].       underline.rjust_with_color(widths[:percent_full]).green               + ' '        +
+    (labels[:mount_options].     underline.ljust_with_color(widths[:mount_options] + 2).magenta        + ' ' if $columns_to_show.include?(:mount_options)).to_s +
+    labels[:uuid].               underline.ljust_with_color(widths[:uuid]).green                       + ' '        +
+    labels[:label].              underline.ljust_with_color(widths[:label]).cyan                       + ' '        +
+    ''
   end
 
   def to_pretty_line(widths = Hash.new(0))
-     device_path.                  ljust(widths[:device_path]).cyan                 + ' '        +
-     mount_path.                   ljust(widths[:mount_path]).green                 + ' '        +
-     space_free.                   rjust(widths[:space_free]).cyan                  + '/'        +
-     capacity.                     rjust(widths[:capacity]).magenta                 + ' '        +
-    (space_free_binary.            rjust(widths[:space_free_binary]).cyan           + '/' if $columns_to_show.include?(:space_free_binary)).to_s +
-    (capacity_binary.              rjust(widths[:capacity_binary]).magenta          + ' ' if $columns_to_show.include?(:capacity_binary)).to_s +
-     colorize_percent(percent_full.rjust(widths[:percent_full]))                    + ' '        +
-     file_system_type.             ljust(widths[:file_system_type]).magenta         + ' '        +
-    ("(#{mount_options})".         ljust(widths[:mount_options] + 2).magenta        + ' ' if $columns_to_show.include?(:mount_options)).to_s +
-     uuid.                         ljust(widths[:uuid]).green                       + ' '        +
-     label.                        ljust(widths[:label]).cyan                       + ' '        +
-     ''
+    (
+      device_path.                  ljust(widths[:device_path]).cyan                 + ' '        +
+      mount_path.                   ljust(widths[:mount_path]).green                 + ' '        +
+      file_system_type.             ljust(widths[:file_system_type]).magenta         + ' '        +
+      space_free.                   rjust(widths[:space_free]).cyan                  + (space_free.blank? ? ' ' : '/') +
+      capacity.                     rjust(widths[:capacity]).magenta                 + ' '        +
+      (space_free_binary.            rjust(widths[:space_free_binary]).cyan           + (space_free_binary.blank? ? ' ' : '/') if $columns_to_show.include?(:space_free_binary)).to_s +
+      (capacity_binary.              rjust(widths[:capacity_binary]).magenta          + ' ' if $columns_to_show.include?(:capacity_binary)).to_s +
+      colorize_percent(percent_full.rjust(widths[:percent_full]))                    + ' '        +
+      ("(#{mount_options})".         ljust(widths[:mount_options] + 2).magenta        + ' ' if $columns_to_show.include?(:mount_options)).to_s +
+      uuid.                         ljust(widths[:uuid]).green                       + ' '        +
+        label.                        ljust(widths[:label]).cyan                       + ' '        +
+        ''
+    )
   end
 
   def method_missing(id, *args)
@@ -298,9 +417,9 @@ end
 require 'getoptlong'
 #require 'optparse'
 opts = GetoptLong.new(
-    [ '--help', '-h',                GetoptLong::NO_ARGUMENT ],
-    [ '--device', '-d',              GetoptLong::NO_ARGUMENT ],
-    [ '--no-color', '--nc',          GetoptLong::NO_ARGUMENT ]
+  [ '--help', '-h',                GetoptLong::NO_ARGUMENT ],
+  [ '--device', '-d',              GetoptLong::NO_ARGUMENT ],
+  [ '--no-color', '--nc',          GetoptLong::NO_ARGUMENT ]
 )
 opts.each do | opt, arg |
   case opt
@@ -320,53 +439,31 @@ end
 
 #---------------------------------------------------------------------------------------------------
 
-
-#lines = `mount`.lines
-#mounts = lines.inject([]) do |mounts, line|
-#  #/dev/sda1 on /media/500B1 type fuseblk (rw,nosuid,nodev,allow_other,default_permissions,blksize=4096)
-#  #/dev/sda2 on /media/500B2 type ext3 
-#  if line.chomp =~ /(\S+) on (\S+) type (.*)$/
-#
-#    name        = $1
-#    mount_point = $2
-#    type        = $3
-#    @longest_name = [name.length, @longest_name.to_i].max
-#
-#    branches << Mount.new(name, mount_point, type)
-#    branches
-#  else
-#    puts "Line in unexpected format: #{line}"
-#  end
+#disks = mtab_disks.values.inject({}) do |hash, obj|
+#  hash[obj.device_path] = obj
+#  hash
 #end
 
-disks = MtabParser.new('/etc/mtab').parse
-
-fdisk_disks = FdiskParser.new.parse if @show_device_info
-
-df_disks = DfParser.new.parse
+fdisk_physical_disks, fdisk_partitions = FdiskParser.new.parse
+disks = PartitionList.new + fdisk_partitions + DfParser.new.parse + MtabParser.new.parse
 vol_ids = BlkidParser.new.parse
+#disks.each {|d| p d}
 
-# Populate each disk object with additional columns
+if @show_device_info
+  Partition.physical_disks = PhysicalDiskList.new
+  Partition.physical_disks += fdisk_physical_disks #+ fdisk_partitions
+end
+
 disks.each do |disk|
   if @show_device_info
     unless disk.physical_disk.device_info
       device_info = HdparmParser.new(`sudo hdparm -i #{disk.device_path}`).parse
-      disk.physical_disk.device_info = device_info.model + 
+      if device_info
+      disk.physical_disk.device_info = device_info.model +
                         ((', Serial: ' + device_info.serial_num) unless device_info.serial_num.blank?).to_s
-    end
-
-    unless disk.physical_disk.physical_capacity
-      fdisk_disk = fdisk_disks[disk.physical_disk_path]
-      disk.physical_disk.physical_capacity        = "#{number_to_human_size(fdisk_disk._?.physical_capacity)}"
-      disk.physical_disk.physical_capacity_binary = "#{number_to_human_size(fdisk_disk._?.physical_capacity, :base => 2)}"
+      end
     end
   end
-
-  disk.capacity                  = "#{number_to_human_size(df_disks[disk.mount_path]._?.capacity)}"
-  disk.capacity_binary           = "#{number_to_human_size(df_disks[disk.mount_path]._?.capacity, :base => 2)}"
-  disk.space_free                = "#{number_to_human_size(df_disks[disk.mount_path]._?.space_free)}"
-  disk.space_free_binary         = "#{number_to_human_size(df_disks[disk.mount_path]._?.space_free, :base => 2)}"
-  disk.percent_full              = df_disks[disk.mount_path]._?.percent_full
 
   if vol_ids[disk.device_path]
     disk.label            = vol_ids[disk.device_path].label ? "Label: \"#{vol_ids[disk.device_path].label }\"" : ''
@@ -377,9 +474,9 @@ disks.each do |disk|
   partition_columns.each do |column|
     disk.send("#{column}=", disk.send(column).to_s)
   end
-  physical_disk_columns.each do |column|
-    disk.physical_disk.send("#{column}=", disk.physical_disk.send(column).to_s)
-  end
+  #physical_disk_columns.each do |column|
+  #  disk.physical_disk.send("#{column}=", disk.physical_disk.send(column).to_s)
+  #end
 end
 
 #---------------------------------------------------------------------------------------------------
@@ -393,21 +490,21 @@ puts Partition.column_headers(widths)
 puts
 
 if @group_by_device
-  disks.group_by(&:physical_disk).sort do |(a_physical_disk, a_disks), (b_physical_disk, b_disks)|
+  disks.sort_by(&:device_path).group_by(&:physical_disk).sort do |(a_physical_disk, a_disks), (b_physical_disk, b_disks)|
     a =         a_physical_disk.device_path
     b =         b_physical_disk.device_path
     a <=> b
   end.each do |physical_disk, disks|
-    width1 = 2 + widths[:device_path] + 1 + widths[:mount_path] + 1 + widths[:space_free]
-    width2 = widths[:percent_full] + 1 + widths[:file_system_type]
+    width1 = 2 + widths[:device_path] + 1 + widths[:mount_path] + 1 + widths[:space_free] + 1 + widths[:file_system_type]
+    width2 = widths[:percent_full]
 
     out =
-      physical_disk.device_path.ljust(width1).cyan                                        + ' ' + 
-      physical_disk.physical_capacity.to_s.rjust(widths[:capacity]).magenta               + ' ' + 
-      ''.rjust(widths[:space_free_binary])                                                + ' ' + 
-      physical_disk.physical_capacity_binary.to_s.rjust(widths[:capacity_binary]).magenta + ' ' + 
-      ''.ljust(width2)                                                                    + ' ' + 
-      "#{physical_disk.device_info}".blue                                                 + ' ' + 
+      physical_disk.device_path.ljust(width1).cyan                                        + ' ' +
+      physical_disk.physical_capacity.to_s.rjust(widths[:capacity]).magenta               + ' ' +
+      ''.rjust(widths[:space_free_binary])                                                + ' ' +
+      physical_disk.physical_capacity_binary.to_s.rjust(widths[:capacity_binary]).magenta + ' ' +
+      ''.ljust(width2)                                                                    + ' ' +
+      "#{physical_disk.device_info}".blue                                                 + ' ' +
       ''
     puts out
 
