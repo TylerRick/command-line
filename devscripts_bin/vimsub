@@ -1,6 +1,13 @@
 #!/bin/bash
 # A powerful, visual global search-and-replace tool powered by vim.
+#---------------------------------------------------------------------------------------------------
+# To do:
+# Make it so I can pipe in the list of files instead of supplying them as an argument. Because this:
+#   cgrep admin_menu app/ | vimsub admin_menu admin
+# seems a lot more natural than this:
+#   vimsub "`cgrep admin_menu app/ --files-with-matches`" admin_menu admin
 
+#---------------------------------------------------------------------------------------------------
 function usage() 
 {
 	cat <<End
