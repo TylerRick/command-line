@@ -86,6 +86,21 @@ Example/motivation:
   give them read access to your directory tree so they could pull any files from you that they don't have, and the file list,
 
 
+Options:
+    [ '--help', '--usage', '-h',                 GetoptLong::NO_ARGUMENT ],
+
+    [ '--print-paths', '-p',                     GetoptLong::NO_ARGUMENT ],
+    [ '--match-method', '-m',                    GetoptLong::REQUIRED_ARGUMENT ],
+
+    [ '--no-overwrite', '--skip', '-s',          GetoptLong::NO_ARGUMENT ],
+    [ '--overwrite', '-f',                       GetoptLong::NO_ARGUMENT ],
+    [ '--add-suffix', '-a',                      GetoptLong::NO_ARGUMENT ],
+    [ '--suffix',                                GetoptLong::REQUIRED_ARGUMENT ],
+
+    [ '--verbose', '-v',                         GetoptLong::NO_ARGUMENT ],
+    [ '--quiet', '-q',                           GetoptLong::NO_ARGUMENT ],
+    [ '--no-act', '--noop', '-n',                GetoptLong::NO_ARGUMENT ]
+
 Option ideas:
 -------------
 #  -o, --output : generates file list in specified file
@@ -119,6 +134,11 @@ end
 #---------------------------------------------------------------------------------------------------
 =begin
 Ideas/to do:
+
+Sort/order the files!
+It jumps around from folder to folder randomly?!
+
+---
 
 Allow custom matching code/tests/algorithms besides basename match
 
@@ -433,9 +453,9 @@ if $0 == __FILE__
         $interactive = false
       end
     else
-      #if ARGV.size < 1
-      #  usage; exit 1
-      #end
+      if ARGV.size < 1
+        usage; exit 1
+      end
       file = Pathname.new(ARGV[0])
       #if file.file?
         #paths_list = file.read.lines.map(&:chomp)
