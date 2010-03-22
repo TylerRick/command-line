@@ -70,6 +70,8 @@ else
 end
 
 #---------------------------------------------------------------------------------------------------
+# Dependencies
+
 require 'csv'
 csv_options = (CSV.send :remove_const, :DEFAULT_OPTIONS).dup
 csv_options[:quote_char] = "'"
@@ -77,87 +79,99 @@ CSV::DEFAULT_OPTIONS = csv_options.freeze
 
 require 'facets/string/bracket'
 require 'quality_extensions/object/send_if'
+require 'quality_extensions/safe_nil'
 
 #---------------------------------------------------------------------------------------------------
-# Optional Pass 1 to get lengths
+class SqlTidy
+  class Inserts
+    InsertRegexp = /^INSERT INTO (\S+) \(([^\)]+)\) VALUES \((.+)\);\s*$/i
 
-InsertStatementRegexp = /^INSERT INTO (\S+) \(([^\)]+)\) VALUES \((.+)\);\s*$/i
-
-cur_table = nil
-widths = {}
-
-lines = input.lines.map do |line|
-  if line =~ InsertStatementRegexp
-    # TODO: move all this to a method which we can reuse in both loops
-    table = $1
-    columns = $2.parse_csv.map(&:strip)
-    
-    # It would be nice if I could get away with just using parse_csv here, but even though it seems to cause no problems to parse the value list as a CSV, when we try to convert it back, we run into one difference from CSV format: CSV doesn't put quotes around strings (unless the string contains commas, etc.).
-    values_from_csv = $3.parse_csv
-    values_with_knowledge_of_quoted = $3.scan(/(?=.)('?)((?:\\'|[^',])*)(\1)(?:, *|\Z)/)
-    was_quoted = values_with_knowledge_of_quoted.map {|a| a[0] == "'"}
-    values     = values_with_knowledge_of_quoted.map {|a| a[1]}
-    if values_from_csv != values
-      STDERR.puts "Warning: Possible bug in our parser/regexp! (We got something different than the CSV library.)"
-      STDERR.puts "values_from_csv=#{values_from_csv.inspect}"
-      STDERR.puts "values         =#{values.inspect}"
+    def initialize(input, options)
+      @input = input
+      @options = options
+      @widths = {}
     end
 
-    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if @options[:unquote_column_names]
+    def each_line(each_table = nil, &each_line)
+      prev_table = nil
 
-    widths[table] ||= []
-    padded_columns = []
-    padded_values = []
-    columns.each.with_index do |column, i|
-      value = values[i].send_if(was_quoted[i], :bracket, "'")
-      widths[table][i] = [widths[table][i] || 0, column.length, value.length].max
+      lines = @input.lines.map do |line|
+        if line =~ InsertRegexp
+          #-----------------------------------------------------------------------------------------
+          # Extract parts from regexp match
+
+          table = $1
+          columns = $2.parse_csv.map(&:strip)
+          
+          # It would be nice if I could get away with just using parse_csv here, but even though it seems to cause no problems to parse the value list as a CSV, when we try to convert it back, we run into one difference from CSV format: CSV doesn't put quotes around strings (unless the string contains commas, etc.).
+          values_from_csv = $3.parse_csv
+          values_with_knowledge_of_quoted = $3.scan(/(?=.)('?)((?:\\'|[^',])*)(\1)(?:, *|\Z)/)
+          values_without_quotes = values_with_knowledge_of_quoted.map {|a| a[1]}
+          was_quoted            = values_with_knowledge_of_quoted.map {|a| a[0] == "'"}
+          values                = values_with_knowledge_of_quoted.map {|a| a.join}
+          if values_from_csv != values_without_quotes
+            STDERR.puts "Warning: Possible bug in our parser/regexp! (We got something different than the CSV library.)"
+            STDERR.puts "values_from_csv=#{values_from_csv.inspect}"
+            STDERR.puts "values         =#{values_without_quotes.inspect}"
+          end
+
+          #-----------------------------------------------------------------------------------------
+
+          if prev_table != table
+            each_table._?.call
+            prev_table = table
+          end
+
+          columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if @options[:unquote_column_names]
+
+          @widths[table] ||= []
+          columns.each.with_index do |column, i|
+            value = values[i]
+            @widths[table][i] = [@widths[table][i] || 0, column.length, value.length].max
+          end
+
+          if block_given?
+            yield true, line, table, columns, values
+          end
+        else
+          # Not an insert_line
+          yield false, line, table, nil, nil, nil
+        end
+      end
     end
-  end
-end if @options[:passes] > 1
 
-#---------------------------------------------------------------------------------------------------
-# The main pass
+    def tidy
+      # Optional Pass 1 to get lengths
+      each_line {} if @options[:passes] > 1
 
-prev_table = nil
-lines = input.lines.map do |line|
-  if line =~ InsertStatementRegexp
-    table = $1
-    if prev_table != table
-      puts @options[:between_tables]
-      prev_table = table
+      #---------------------------------------------------------------------------------------------
+      # The main pass
+      each_table = proc {
+        puts @options[:between_tables]
+      }
+
+      each_line(each_table) do |is_insert_line, line, table, columns, values|
+        if is_insert_line
+          padded_columns = []
+          padded_values = []
+          columns.each.with_index do |column, i|
+            value = values[i]
+            padded_columns << column.ljust(@widths[table][i])
+            padded_values  << value. ljust(@widths[table][i])
+          end
+
+          puts \
+            "INSERT INTO #{    table       } (#{padded_columns.join(', ')})\n" +
+            "            #{' '*table.length} (#{padded_values. join(', ')})\n" +
+            @options[:between_rows].to_s
+        else
+          puts line
+        end
+      end
     end
 
-    columns = $2.parse_csv.map(&:strip)
-    
-    values_from_csv = $3.parse_csv
-    values_with_knowledge_of_quoted = $3.scan(/(?=.)('?)((?:\\'|[^',])*)(\1)(?:, *|\Z)/)
-    was_quoted = values_with_knowledge_of_quoted.map {|a| a[0] == "'"}
-    values     = values_with_knowledge_of_quoted.map {|a| a[1]}
-    if values_from_csv != values
-      STDERR.puts "Warning: Possible bug in our parser/regexp! (We got something different than the CSV library.)"
-      STDERR.puts "values_from_csv=#{values_from_csv.inspect}"
-      STDERR.puts "values         =#{values.inspect}"
-    end
-
-    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if @options[:unquote_column_names]
-
-    widths[table] ||= []
-    padded_columns = []
-    padded_values = []
-    columns.each.with_index do |column, i|
-      value = values[i].send_if(was_quoted[i], :bracket, "'")
-      widths[table][i] = [widths[table][i] || 0, column.length, value.length].max
-      padded_columns << column.ljust(widths[table][i])
-      padded_values  << value. ljust(widths[table][i])
-    end
-
-    puts \
-      "INSERT INTO #{    table       } (#{padded_columns.join(', ')})\n" +
-      "            #{' '*table.length} (#{padded_values. join(', ')})\n" +
-      @options[:between_rows].to_s
-  else
-    puts line
   end
 end
 
 #---------------------------------------------------------------------------------------------------
+puts SqlTidy::Inserts.new(input, @options).tidy
