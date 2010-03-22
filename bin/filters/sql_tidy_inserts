@@ -1,8 +1,26 @@
 #!/usr/bin/ruby
 # a filter/pipeline command
 
-def usage
-  puts <<End
+#---------------------------------------------------------------------------------------------------
+# To do:
+
+#---------------------------------------------------------------------------------------------------
+# Parse args
+
+require 'optparse'
+
+@options = {
+  unquote_column_names: true,
+
+  between_tables: '=',
+  between_rows: 'newline',
+
+  passes: 2,
+}
+
+def parse_args
+  ARGV.options do |opts|
+    opts.banner = <<End
 Usage: stdin | #{File.basename($0)}
 Usage: #{File.basename($0)} input_file
 
@@ -10,13 +28,39 @@ Formats all the INSERT statements in a DB dump (.sql file) nicely, breaking each
 (line 1 for the column names, line 2 for the values) and aligning the values with its corresponding
 column name.
 End
-  exit
-end
-usage if ARGV[0] == '-h'
 
-#---------------------------------------------------------------------------------------------------
-# To do:
-# * add an option for aligning the , characters themselves
+    opts.on("--unquote-column-names {0|1}", Integer, "Remove ` from column names that are simple enough to not require them") \
+      {|v| @options[:unquote_column_names] = v == 1 }
+
+    opts.on("--between-tables <string>", "Output <string> between each table. = (default) is a line of ='s) (Pass --between-tables='' for no separator.)") \
+      {|v| @options[:between_tables] = v*100 }
+
+    opts.on("--between-rows <string>", "Output <string> between each row. 'newline' (default) will put a blank line after each insert.) (Pass --between-tables='' for no separator.)") \
+      {|v| @options[:between_rows] = v }
+
+    opts.on("--passes <num>", Integer, "2 passes (the default) are required for best results. With only 1 pass, we don't know the lengths of values we haven't encountered yet, so the best we can do is base our current width on the present and past values.") \
+      {|v| @options[:passes] = v }
+
+    opts.separator ""
+
+    opts.on("-v", "--verbose", "Be more verbose") \
+      { @options[:verbose] = true }
+
+    opts.on("-h", "--help", "Show this help message.") \
+      { puts opts; exit }
+
+    opts.parse!
+  end
+end
+parse_args
+
+if ARGV.size == 0
+  ARGV.unshift '--help'
+  parse_args
+end
+
+v = @options[:between_tables]; @options[:between_tables] = v ? "/*#{v.to_s*100}*/" : ''
+v = @options[:between_rows]; @options[:between_rows] = {'newline' => "\n"}[v] || v 
 
 #---------------------------------------------------------------------------------------------------
 if ARGV[0]
@@ -25,15 +69,6 @@ else
   input = STDIN.read
 end
 
-options = {}
-
-# Remove ` from column names that are simple enough to not require them
-options[:unquote_column_names] = true
-
-options[:newline_between_rows] = true
-
-options[:passes] = 2
-
 #---------------------------------------------------------------------------------------------------
 require 'csv'
 csv_options = (CSV.send :remove_const, :DEFAULT_OPTIONS).dup
@@ -41,55 +76,76 @@ csv_options[:quote_char] = "'"
 CSV::DEFAULT_OPTIONS = csv_options.freeze
 
 require 'facets/string/bracket'
+require 'quality_extensions/object/send_if'
 
 #---------------------------------------------------------------------------------------------------
 # Optional Pass 1 to get lengths
 
-InsertStatementRegexp = /^INSERT INTO (\S+) \(([^\)]+)\) VALUES \(([^\)]+)\);\s*$/i
+InsertStatementRegexp = /^INSERT INTO (\S+) \(([^\)]+)\) VALUES \((.+)\);\s*$/i
 
 cur_table = nil
 widths = {}
 
 lines = input.lines.map do |line|
   if line =~ InsertStatementRegexp
+    # TODO: move all this to a method which we can reuse in both loops
     table = $1
     columns = $2.parse_csv.map(&:strip)
-    values = $3.parse_csv
+    
+    # It would be nice if I could get away with just using parse_csv here, but even though it seems to cause no problems to parse the value list as a CSV, when we try to convert it back, we run into one difference from CSV format: CSV doesn't put quotes around strings (unless the string contains commas, etc.).
+    values_from_csv = $3.parse_csv
+    values_with_knowledge_of_quoted = $3.scan(/(?=.)('?)((?:\\'|[^',])*)(\1)(?:, *|\Z)/)
+    was_quoted = values_with_knowledge_of_quoted.map {|a| a[0] == "'"}
+    values     = values_with_knowledge_of_quoted.map {|a| a[1]}
+    if values_from_csv != values
+      STDERR.puts "Warning: Possible bug in our parser/regexp! (We got something different than the CSV library.)"
+      STDERR.puts "values_from_csv=#{values_from_csv.inspect}"
+      STDERR.puts "values         =#{values.inspect}"
+    end
 
-    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if options[:unquote_column_names]
-
-    #p columns
-    #p values
+    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if @options[:unquote_column_names]
 
     widths[table] ||= []
     padded_columns = []
     padded_values = []
     columns.each.with_index do |column, i|
-      value = values[i]
+      value = values[i].send_if(was_quoted[i], :bracket, "'")
       widths[table][i] = [widths[table][i] || 0, column.length, value.length].max
     end
   end
-end if options[:passes] > 1
+end if @options[:passes] > 1
 
 #---------------------------------------------------------------------------------------------------
 # The main pass
 
+prev_table = nil
 lines = input.lines.map do |line|
   if line =~ InsertStatementRegexp
     table = $1
+    if prev_table != table
+      puts @options[:between_tables]
+      prev_table = table
+    end
+
     columns = $2.parse_csv.map(&:strip)
-    values = $3.parse_csv
+    
+    values_from_csv = $3.parse_csv
+    values_with_knowledge_of_quoted = $3.scan(/(?=.)('?)((?:\\'|[^',])*)(\1)(?:, *|\Z)/)
+    was_quoted = values_with_knowledge_of_quoted.map {|a| a[0] == "'"}
+    values     = values_with_knowledge_of_quoted.map {|a| a[1]}
+    if values_from_csv != values
+      STDERR.puts "Warning: Possible bug in our parser/regexp! (We got something different than the CSV library.)"
+      STDERR.puts "values_from_csv=#{values_from_csv.inspect}"
+      STDERR.puts "values         =#{values.inspect}"
+    end
 
-    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if options[:unquote_column_names]
-
-    #p columns
-    #p values
+    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if @options[:unquote_column_names]
 
     widths[table] ||= []
     padded_columns = []
     padded_values = []
     columns.each.with_index do |column, i|
-      value = values[i]
+      value = values[i].send_if(was_quoted[i], :bracket, "'")
       widths[table][i] = [widths[table][i] || 0, column.length, value.length].max
       padded_columns << column.ljust(widths[table][i])
       padded_values  << value. ljust(widths[table][i])
@@ -98,9 +154,10 @@ lines = input.lines.map do |line|
     puts \
       "INSERT INTO #{    table       } (#{padded_columns.join(', ')})\n" +
       "            #{' '*table.length} (#{padded_values. join(', ')})\n" +
-      (options[:newline_between_rows] ? "\n" : '')
+      @options[:between_rows].to_s
   else
     puts line
   end
 end
 
+#---------------------------------------------------------------------------------------------------
