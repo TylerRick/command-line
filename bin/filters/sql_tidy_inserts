@@ -1,0 +1,106 @@
+#!/usr/bin/ruby
+# a filter/pipeline command
+
+def usage
+  puts <<End
+Usage: stdin | #{File.basename($0)}
+Usage: #{File.basename($0)} input_file
+
+Formats all the INSERT statements in a DB dump (.sql file) nicely, breaking each into 2 lines
+(line 1 for the column names, line 2 for the values) and aligning the values with its corresponding
+column name.
+End
+  exit
+end
+usage if ARGV[0] == '-h'
+
+#---------------------------------------------------------------------------------------------------
+# To do:
+# * add an option for aligning the , characters themselves
+
+#---------------------------------------------------------------------------------------------------
+if ARGV[0]
+  input = File.read(ARGV[0])
+else
+  input = STDIN.read
+end
+
+options = {}
+
+# Remove ` from column names that are simple enough to not require them
+options[:unquote_column_names] = true
+
+options[:newline_between_rows] = true
+
+options[:passes] = 2
+
+#---------------------------------------------------------------------------------------------------
+require 'csv'
+csv_options = (CSV.send :remove_const, :DEFAULT_OPTIONS).dup
+csv_options[:quote_char] = "'"
+CSV::DEFAULT_OPTIONS = csv_options.freeze
+
+require 'facets/string/bracket'
+
+#---------------------------------------------------------------------------------------------------
+# Optional Pass 1 to get lengths
+
+InsertStatementRegexp = /^INSERT INTO (\S+) \(([^\)]+)\) VALUES \(([^\)]+)\);\s*$/i
+
+cur_table = nil
+widths = {}
+
+lines = input.lines.map do |line|
+  if line =~ InsertStatementRegexp
+    table = $1
+    columns = $2.parse_csv.map(&:strip)
+    values = $3.parse_csv
+
+    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if options[:unquote_column_names]
+
+    #p columns
+    #p values
+
+    widths[table] ||= []
+    padded_columns = []
+    padded_values = []
+    columns.each.with_index do |column, i|
+      value = values[i]
+      widths[table][i] = [widths[table][i] || 0, column.length, value.length].max
+    end
+  end
+end if options[:passes] > 1
+
+#---------------------------------------------------------------------------------------------------
+# The main pass
+
+lines = input.lines.map do |line|
+  if line =~ InsertStatementRegexp
+    table = $1
+    columns = $2.parse_csv.map(&:strip)
+    values = $3.parse_csv
+
+    columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if options[:unquote_column_names]
+
+    #p columns
+    #p values
+
+    widths[table] ||= []
+    padded_columns = []
+    padded_values = []
+    columns.each.with_index do |column, i|
+      value = values[i]
+      widths[table][i] = [widths[table][i] || 0, column.length, value.length].max
+      padded_columns << column.ljust(widths[table][i])
+      padded_values  << value. ljust(widths[table][i])
+    end
+
+    puts \
+      "INSERT INTO #{    table       } (#{padded_columns.join(', ')})\n" +
+      "            #{' '*table.length} (#{padded_values. join(', ')})\n" +
+      (options[:newline_between_rows] ? "\n" : '')
+  else
+    puts line
+  end
+end
+
