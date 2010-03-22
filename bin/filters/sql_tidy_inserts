@@ -3,6 +3,8 @@
 
 #---------------------------------------------------------------------------------------------------
 # To do:
+# * Make it possible to adjust foreign key ids too: 
+#   --start-ids-at='{users: {id:90, address_id:20}, addresses: {id:20}, posts:{id:4000, user_id:90} }'
 
 #---------------------------------------------------------------------------------------------------
 # Parse args
@@ -41,6 +43,9 @@ End
     opts.on("--passes <num>", Integer, "2 passes (the default) are required for best results. With only 1 pass, we don't know the lengths of values we haven't encountered yet, so the best we can do is base our current width on the present and past values.") \
       {|v| @options[:passes] = v }
 
+    opts.on("--start-ids-at <ruby_hash>", "Adjust IDs to start at a different number (in case there are conflicts between ids in the dump and ids added since then in the actual database). <ruby_hash> can be {table:id} or {table:{column:id}}. Example: --start-ids-at='{users:90}'") \
+      {|v| @options[:start_ids_at] = eval(v) }
+
     opts.separator ""
 
     opts.on("-v", "--verbose", "Be more verbose") \
@@ -59,8 +64,26 @@ if ARGV.size == 0
   parse_args
 end
 
+#---------------------------------------------------------------------------------------------------
+# Normalize/adjust options
+
 v = @options[:between_tables]; @options[:between_tables] = v ? "/*#{v.to_s*100}*/" : ''
 v = @options[:between_rows]; @options[:between_rows] = {'newline' => "\n"}[v] || v 
+
+if v = @options[:start_ids_at]
+  @options[:start_ids_at] = v.inject({}) do |hash, (k,v)|
+    if v.is_a?(Hash)
+      hash[k] = v
+    elsif v.is_a?(Fixnum)
+      hash[k] ||= {}
+      hash[k][:id] = v
+    else
+      raise "start_ids_at[#{k}] was #{v} (class #{v.class}), but was expected to be either a Hash or a Fixnum"
+    end
+    hash
+  end
+  STDERR.puts @options[:start_ids_at].inspect if @options[:verbose]
+end
 
 #---------------------------------------------------------------------------------------------------
 if ARGV[0]
@@ -80,6 +103,7 @@ CSV::DEFAULT_OPTIONS = csv_options.freeze
 require 'facets/string/bracket'
 require 'quality_extensions/object/send_if'
 require 'quality_extensions/safe_nil'
+require 'active_support' if @options[:start_ids_at]
 
 #---------------------------------------------------------------------------------------------------
 class SqlTidy
@@ -89,7 +113,12 @@ class SqlTidy
     def initialize(input, options)
       @input = input
       @options = options
+      @id_values = {}
       @widths = {}
+    end
+
+    def normalize_table_name(table_name)
+      table_name._?.unbracket("`").to_sym
     end
 
     def each_line(each_table = nil, &each_line)
@@ -100,7 +129,8 @@ class SqlTidy
           #-----------------------------------------------------------------------------------------
           # Extract parts from regexp match
 
-          table = $1
+          table_orig = $1
+          table = normalize_table_name(table_orig)
           columns = $2.parse_csv.map(&:strip)
           
           # It would be nice if I could get away with just using parse_csv here, but even though it seems to cause no problems to parse the value list as a CSV, when we try to convert it back, we run into one difference from CSV format: CSV doesn't put quotes around strings (unless the string contains commas, etc.).
@@ -124,25 +154,37 @@ class SqlTidy
 
           columns.map! {|column| column =~ /\A`\w+`\Z/ ? column.unbracket('`') : column } if @options[:unquote_column_names]
 
+          @id_values[table] ||= {}
           @widths[table] ||= []
+
           columns.each.with_index do |column, i|
             value = values[i]
+
+            if column =~ /id/
+              @id_values[table][column.to_sym] ||= []
+              @id_values[table][column.to_sym] |= [value.to_i]
+              #puts "@id_values[#{table.inspect}]=#{@id_values[table].inspect}"
+            end
+
             @widths[table][i] = [@widths[table][i] || 0, column.length, value.length].max
           end
 
           if block_given?
-            yield true, line, table, columns, values
+            yield true, line, table_orig, columns, values
           end
+
+        # Not an insert_line
         else
-          # Not an insert_line
-          yield false, line, table, nil, nil, nil
+          if block_given?
+            yield false, line, table_orig, nil, nil, nil
+          end
         end
       end
     end
 
     def tidy
       # Optional Pass 1 to get lengths
-      each_line {} if @options[:passes] > 1
+      each_line if @options[:passes] > 1
 
       #---------------------------------------------------------------------------------------------
       # The main pass
@@ -150,19 +192,23 @@ class SqlTidy
         puts @options[:between_tables]
       }
 
-      each_line(each_table) do |is_insert_line, line, table, columns, values|
+      each_line(each_table) do |is_insert_line, line, table_orig, columns, values|
         if is_insert_line
+          table = normalize_table_name(table_orig)
           padded_columns = []
           padded_values = []
           columns.each.with_index do |column, i|
             value = values[i]
-            padded_columns << column.ljust(@widths[table][i])
-            padded_values  << value. ljust(@widths[table][i])
+            value = adjust_id(table, column, value)
+            @widths[table][i] = [@widths[table][i] || 0, column.to_s.length, value.to_s.length].max
+
+            padded_columns << column.to_s.ljust(@widths[table][i])
+            padded_values  << value. to_s.ljust(@widths[table][i])
           end
 
           puts \
-            "INSERT INTO #{    table       } (#{padded_columns.join(', ')})\n" +
-            "            #{' '*table.length} (#{padded_values. join(', ')})\n" +
+            "INSERT INTO #{    table_orig       } (#{padded_columns.join(', ')})\n" +
+            "     VALUES #{' '*table_orig.length} (#{padded_values. join(', ')});\n" +
             @options[:between_rows].to_s
         else
           puts line
@@ -170,8 +216,51 @@ class SqlTidy
       end
     end
 
+
+    def adjust_id(table, column, value)
+      if @options[:start_ids_at]
+        new_start_id = nil
+
+        #puts "@options[:start_ids_at][#{table._?.to_sym}] = #{@options[:start_ids_at][table._?.to_sym]}"
+        if start_id_for_this_table = @options[:start_ids_at][table._?.to_sym]._?[column.to_sym]
+          new_start_id = start_id_for_this_table
+          lookup_table = table
+          lookup_column = column
+        end
+
+        if new_start_id.nil?
+          if column =~ /^(\w*)_id$/
+            table_for_foreign_key = $1.pluralize.to_sym
+          end
+          if start_id_for_foreign_table = @options[:start_ids_at][table_for_foreign_key._?.to_sym]._?[:id]
+            new_start_id = start_id_for_foreign_table
+            lookup_table = table_for_foreign_key
+            lookup_column = :id
+          end
+        end
+
+        if new_start_id
+          # The lowest (min) value we've seen for this column so far (start_id) will be mapped to new_start_id
+          # and every other (higher) value will be as much more than new_start_id as it was from that min value.
+          #puts "new_start_id=#{new_start_id.inspect}"
+          #puts "@id_values[#{lookup_table}][#{lookup_column}]=#{@id_values[lookup_table][lookup_column].inspect}"
+          if value.to_s =~ /^\d*$/
+            #puts "@id_values[#{lookup_table}][#{lookup_column}]=#{@id_values[lookup_table].inspect}[#{lookup_column.inspect}]"
+            start_id = @id_values[lookup_table][lookup_column.to_sym].min
+            offset = value.to_i - start_id
+            new_value = new_start_id + offset
+            puts "/* Adjusting #{column} column from #{value} to #{new_value} (started at: #{start_id} => #{new_start_id}, offset: #{offset}) */" if @options[:verbose]
+            return new_value
+          else
+            puts "/* Can't adjust #{column} column from #{value} -- not numeric */" if @options[:verbose]
+          end
+        end
+      end
+      return value
+    end
+
   end
 end
 
 #---------------------------------------------------------------------------------------------------
-puts SqlTidy::Inserts.new(input, @options).tidy
+SqlTidy::Inserts.new(input, @options).tidy
