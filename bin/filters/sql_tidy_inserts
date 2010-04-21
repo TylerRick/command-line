@@ -1,4 +1,4 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby1.9.1
 # a filter/pipeline command
 
 #---------------------------------------------------------------------------------------------------
@@ -61,11 +61,6 @@ End
 end
 parse_args
 
-if ARGV.size == 0
-  ARGV.unshift '--help'
-  parse_args
-end
-
 #---------------------------------------------------------------------------------------------------
 # Normalize/adjust options
 
@@ -110,7 +105,7 @@ require 'active_support' if @options[:start_ids_at]
 #---------------------------------------------------------------------------------------------------
 class SqlTidy
   class Inserts
-    InsertRegexp = /^INSERT INTO (\S+) \(([^\)]+)\) VALUES ?\((.+)\);?\s*$/i
+    InsertRegexp = /^(.*)INSERT INTO (\S+) \(([^\)]+)\) VALUES ?\((.+)\);?\s*$/i
 
     def initialize(input, options)
       @input = input
@@ -131,7 +126,7 @@ class SqlTidy
           #-----------------------------------------------------------------------------------------
           # Extract parts from regexp match
 
-          table_orig, columns, values_orig = $1, $2, $3
+          pre, table_orig, columns, values_orig = $1, $2, $3, $4
           table = normalize_table_name(table_orig)
 
           columns = columns.parse_csv.map(&:strip)
@@ -180,13 +175,13 @@ class SqlTidy
           end
 
           if block_given?
-            yield true, line, table_orig, columns, values
+            yield true, line, pre, table_orig, columns, values
           end
 
         # Not an insert_line
         else
           if block_given?
-            yield false, line, table_orig, nil, nil, nil
+            yield false, line, pre, table_orig, nil, nil, nil
           end
         end
       end
@@ -202,7 +197,7 @@ class SqlTidy
         puts @options[:between_tables]
       }
 
-      each_line(each_table) do |is_insert_line, line, table_orig, columns, values|
+      each_line(each_table) do |is_insert_line, line, pre, table_orig, columns, values|
         if is_insert_line
           table = normalize_table_name(table_orig)
           padded_columns = []
@@ -217,8 +212,8 @@ class SqlTidy
           end
 
           puts \
-            "INSERT INTO #{    table_orig.rjust(6)           } (#{padded_columns.join(', ')})\n" +
-            "            #{'VALUES'.rjust(table_orig.length)} (#{padded_values. join(', ')});\n" +
+            "#{pre           }INSERT INTO #{               table_orig.rjust(6)} (#{padded_columns.join(', ')})\n" +
+            "#{' '*pre.length}            #{'VALUES'.rjust(table_orig.length) } (#{padded_values. join(', ')});\n" +
             @options[:between_rows].to_s
         else
           puts line
