@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+# lsd -- ls plus descriptions for each directory listed
+
+require 'pathname'
+require 'quality_extensions/string/prefix'
+
+Pathname.new('.').children.each do |dir|
+  next unless dir.directory?
+  puts dir.to_s.ljust(20)
+
+  # Look for a summary/description
+  gemspec = dir.children.detect {|f| f.basename.to_s =~ /gemspec/}
+  readme = dir.children.detect {|f| f.basename.to_s =~ /readme/i}
+  if gemspec
+    puts gemspec
+    puts gemspec.read.grep(/description *=|summary *=/).join("").prefix_lines('  ')
+  end
+end
+
