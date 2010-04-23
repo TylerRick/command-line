@@ -84,9 +84,13 @@ end
 
 #---------------------------------------------------------------------------------------------------
 if ARGV[0]
-  input = File.read(ARGV[0])
+  input = File.open(ARGV[0])
 else
-  input = STDIN.read
+  input = STDIN
+  if input.stat.pipe?
+    STDERR.puts "Input is pipe. We will only do a single pass (since we can't rewind a pipe)."
+    @options[:passes] = 1
+  end
 end
 
 #---------------------------------------------------------------------------------------------------
@@ -100,6 +104,7 @@ CSV::DEFAULT_OPTIONS = csv_options.freeze
 require 'facets/string/bracket'
 require 'quality_extensions/object/send_if'
 require 'quality_extensions/safe_nil'
+require 'quality_extensions/string/with_knowledge_of_color'
 require 'active_support' if @options[:start_ids_at]
 
 #---------------------------------------------------------------------------------------------------
@@ -121,7 +126,8 @@ class SqlTidy
     def each_line(each_table = nil, &each_line)
       prev_table = nil
 
-      lines = @input.lines.map do |line|
+      @input.each_line do |line|
+        line = line.strip_color
         if line =~ InsertRegexp
           #-----------------------------------------------------------------------------------------
           # Extract parts from regexp match
@@ -189,7 +195,7 @@ class SqlTidy
 
     def tidy
       # Optional Pass 1 to get lengths
-      each_line if @options[:passes] > 1
+      (each_line; @input.rewind) if @options[:passes] > 1
 
       #---------------------------------------------------------------------------------------------
       # The main pass
