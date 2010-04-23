@@ -107,6 +107,14 @@ require 'quality_extensions/safe_nil'
 #require 'quality_extensions/string/with_knowledge_of_color'
 require 'active_support' if @options[:start_ids_at]
 
+begin
+  require 'colored'
+  $colored=true
+rescue LoadError
+  STDERR.puts "Warning: Could not load colored gem"
+  $colored=false
+end
+
 #---------------------------------------------------------------------------------------------------
 class SqlTidy
   class Inserts
@@ -200,7 +208,7 @@ class SqlTidy
       #---------------------------------------------------------------------------------------------
       # The main pass
       each_table = proc {
-        puts @options[:between_tables]
+        puts @options[:between_tables].send_if($colored, :magenta)
       }
 
       each_line(each_table) do |is_insert_line, line, pre, table_orig, columns, values, after|
