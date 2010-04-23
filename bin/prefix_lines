@@ -16,8 +16,7 @@ prefix = ARGV[0]
 
 @strip = true
 
-lines = STDIN.lines.map do |line|
-  line = prefix + line
+lines = STDIN.each_line do |line|
+  puts prefix + line
 end
-puts lines.join
 
