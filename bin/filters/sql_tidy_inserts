@@ -104,7 +104,7 @@ CSV::DEFAULT_OPTIONS = csv_options.freeze
 require 'facets/string/bracket'
 require 'quality_extensions/object/send_if'
 require 'quality_extensions/safe_nil'
-#require 'quality_extensions/string/with_knowledge_of_color'
+require 'quality_extensions/string/with_knowledge_of_color'
 require 'active_support' if @options[:start_ids_at]
 
 begin
@@ -226,8 +226,8 @@ class SqlTidy
           end
 
           puts \
-            "#{pre           }INSERT INTO #{               table_orig.rjust(6)} (#{padded_columns.join(', ')})#{after}\n" +
-            "#{' '*pre.length}            #{'VALUES'.rjust(table_orig.length) } (#{padded_values. join(', ')})#{after}\n" +
+            "#{pre                         }#{                                  }INSERT INTO #{table_orig.rjust(6)} (#{padded_columns.join(', ')})#{after}\n" +
+            "#{' '*pre.length_without_color}#{'VALUES'.ljust(table_orig.length) }             (#{padded_values. join(', ')})#{after}\n" +
             @options[:between_rows].to_s
         else
           puts line
