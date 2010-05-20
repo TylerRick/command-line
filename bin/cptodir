@@ -1,0 +1,78 @@
+#!/usr/bin/ruby
+require 'rubygems'
+require 'quality_extensions/pathname'
+require 'facets'
+
+# To do:
+# * remove duplication from ~/public/shell/bin/mvtodir
+
+# TODO: getopt
+@verbose = true
+@op = 'cp'
+
+if ARGV.size < 2
+  puts <<End
+Usage: #{File.basename($0)} [options] <files...> <dir>
+
+<dir> need not already exist; it will be created it if does not.
+
+This is better than simply doing mkdir <dir>; #{@op} <files...> <dir>, because that will try to move <dir> to itself.
+#{File.basename($0)} will detect if you accidentally give the dest dir as one of the sources (which will happen whenever you supply * for <files>) and will skip that, #{@op == 'cp' ? 'copying' : 'moving'} all other files, which is probably what you wanted...
+(Besides, #{File.basename($0)}  is less to type).
+
+Similar to this option from #{@op}:
+       -t, --target-directory=DIRECTORY
+                     #{@op == 'cp' ? 'copy' : 'move'} all SOURCE arguments into DIRECTORY
+
+
+Options:
+--on-conflict=<arg>, where <arg> can be overwrite, ask, copy-to-subdir, or add-suffix
+
+--create-subdir=<arg>, where <arg> can be all or on-conflict (default)
+
+  #{File.basename($0)} --create-subdir=all ./neat_file backups
+  => backups/20090111T1329/neat_file
+  #{File.basename($0)} --create-subdir ./neat_file backups
+  => backups/20090111T1400/neat_file
+  ??
+
+--create-subdir-style=<arg>, where <arg> can be 
+  'now' (default): creates a subdirectory with the name taken from the 'now' command (the format of which can be configured with a ~/.now file?)
+  ...
+
+
+--verbose
+--silent
+End
+  exit 1
+end
+
+
+sources, dest = ARGV[0 .. -2], ARGV[-1]
+sources, dest = sources.map(&Pathname), Pathname.new(dest)
+
+sources.reject! {|source| 
+  if source.absolutize == dest.absolutize
+    puts "Warning: Destination dir '#{source}' given as a source file to move. Skipping..."
+    true
+  end
+}
+
+(STDERR.puts "Error: No source files to #{@op == 'cp' ? 'copy' : 'move'}. Aborting..."; exit 1) if sources.empty?
+
+if !dest.exist?
+  puts "#{dest} doesn't exist yet. Creating..."
+  dest.mkpath
+end
+sources.each do |source|
+  #puts "Moving #{source} to #{dest}..."
+  begin
+    source.send @op, dest, :verbose => @verbose
+  rescue Errno::EEXIST
+    STDERR.puts "File appears to already exist in dest dir (#{$!.inspect})"
+  end
+end
+
+#system %(mkdir -p #{ARGV[-1]})
+#system %(mv #{ARGV[-1]})
+

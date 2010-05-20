@@ -72,26 +72,28 @@ alias cppa='cp --parents'
 #   mkdir ./spec/models
 #   cp /long/path/to/spec/models/company_spec.rb $_
 #
-function cpmkdir {
-  if [[ $# < 2 ]]; then
-    echo "Usage: cpmkdir source_files... dir1/dir2/.../"
-  else
-    firsts=( )
-    dir_path=${!#}
-    mkdir -p $dir_path && \
-    cp "$@"
-  fi
-}
-function mvmkdir {
-  if [[ $# < 2 ]]; then
-    echo "Usage: mvmkdir source_file dir1/dir2/.../"
-  else
-    #dirs=`dirname $2`
-    dirs=$2
-    mkdir -p $dirs && \
-    mv "$@"
-  fi
-}
+#function cpmkdir {
+#  if [[ $# < 2 ]]; then
+#    echo "Usage: cpmkdir source_files... dir1/dir2/.../"
+#  else
+#    firsts=( )
+#    dir_path=${!#}
+#    mkdir -p $dir_path && \
+#    cp "$@"
+#  fi
+#}
+#function mvmkdir {
+#  if [[ $# < 2 ]]; then
+#    echo "Usage: mvmkdir source_file dir1/dir2/.../"
+#  else
+#    #dirs=`dirname $2`
+#    dirs=$2
+#    mkdir -p $dirs && \
+#    mv "$@"
+#  fi
+#}
+#
+# These versions have been obsoleted by ruby scripts cptodir/mvtodir
 
 alias vimo='vimopen'
 
