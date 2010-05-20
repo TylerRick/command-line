@@ -1,0 +1,9 @@
+#!/bin/bash
+
+#----------------------------------------------------------------------------------------------------
+# Find the n most recently modified files
+# [how?]
+
+#findmodsince '2010-02-11 12:00'|xargs ls -aldt
+echo findmodsince $(date '+%Y-%m-%d %H:00') \|xargs ls -aldt
+     findmodsince $(date '+%Y-%m-%d %H:30') | xargs ls -aldt | egrep -v '.sw.$'
