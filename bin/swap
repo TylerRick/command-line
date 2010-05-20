@@ -1,4 +1,30 @@
-#swap a b should do:
-#mv a b.new
-#mv b a
-#mv b.new b
+#!/bin/sh
+if [ -z "$2" ]; then
+  cat - <<End
+Usage: `basename $0` file_a file_b
+
+> echo a > a
+> echo b > b
+> swap a b
+> cat a b
+b
+a
+End
+  exit 1
+fi
+
+a=$1
+b=$2
+[ -e $a ] || { echo "$a does not exist"; abort=1; }
+[ -e $b ] || { echo "$b does not exist"; abort=1; }
+[ -z "$abort" ] || { echo "Aborting"; exit 1; }
+
+b_temp=`tempfile -p "$b.temp"`
+#echo $b_temp
+if [ "$?" != "0" ]; then
+	echo "Could not create temp file" >&2
+	exit 1
+fi
+mv $a $b_temp
+mv $b $a
+mv $b_temp $b
