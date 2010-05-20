@@ -1,0 +1,4 @@
+#!/bin/sh
+
+#sudo chown `whoami` "$@"
+sudo chown `whoami`:`whoami` -R ${1:-.}
