@@ -8,3 +8,6 @@
 *.svn-base
 *~
 #*.vim
+log/*
+tmp/*
+doc/guides/*

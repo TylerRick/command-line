@@ -13,15 +13,17 @@
     ci = commit
     co = checkout
     cp = copy
+    ch = cherry-pick
     eu = each-unadded
     sr = svn rebase
     sdc = svn dcommit
+    discard = checkout HEAD
     uncommit = reset --soft HEAD^
     pushinit = push origin master:refs/heads/master
 [branch]
 	autosetupmerge = true
 [core]
-	excludesfile = $HOME/.gitignore
+	excludesfile = /home/tyler/.gitignore
 
 #[merge]
 #  tool = vimdiff
@@ -40,3 +42,5 @@
 	keepBackup = false
 	trustExitCode = false
 
+[github]
+	user = TylerRick
