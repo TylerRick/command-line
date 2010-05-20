@@ -26,7 +26,7 @@ $PATH
 #fi
 
 # Lets me use the development version from the SCM instead of having to install a gem
-export RUBYLIB=$RUBYLIB:$HOME/dev/git/ruby-git/lib
+#export RUBYLIB=$RUBYLIB:$HOME/dev/git/ruby-git/lib
 
 export RUBYOPT=rubygems
 
@@ -42,14 +42,56 @@ export VISUAL=$EDITOR
 alias xargs1='xargs -n1 -I{}'
 
 alias dpkg-listfiles='dpkg --listfiles'
+alias dpkg-searchforfile='dpkg-query --search'
 alias receive-ppa-key='sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys'
 
-# example:
-#    /usr/lib/ruby/gems/1.8/gems/capistrano-2.5.0/lib  > cppa ./capistrano/configuration/actions/inspect.rb ~/public/examples/ruby/input_ouput/
+# Example:
+#    /path/to/project_a > cppa ./subdir1/subdir2/file /path/to/project_b
 # Is *much* shorter than:
-#    mkdir -p ~/public/examples/ruby/input_ouput/capistrano/configuration/actions/
-#    cp ./capistrano/configuration/actions/inspect.rb ~/public/examples/ruby/input_ouput/capistrano/configuration/actions/
+#    mkdir -p /path/to/project_b/subdir1/subdir2/
+#    cp ./subdir1/subdir2/file /path/to/project_b/subdir1/subdir2/
+# (Although, you could have shortened that to:
+#    mkdir -p /path/to/project_b/subdir1/subdir2/
+#    cp ./subdir1/subdir2/file $_
+# )
+#
+# It will do the mkdir for you if dest_dir doesn't exist.
+# The caveat is that you have to cd into the right dir first since your entire arg1 will be appended to arg2 to come up with the dest.
+#
 alias cppa='cp --parents'
+
+# It works great if you're already in the right directory. But often I'm not in the right directory
+# for that to work and I don't want *all* of the parent directories from the source arg to be used
+# to build the dest path.
+# I still want the benefit of the mkdir being automatically taken care of for me, but I would rather
+# list the dest dir explicitly in the dest argument.
+#
+# Example:
+#   cpmkdir /long/path/to/spec/models/company_spec.rb ./spec/models
+# is shorter than:
+#   mkdir ./spec/models
+#   cp /long/path/to/spec/models/company_spec.rb $_
+#
+function cpmkdir {
+  if [[ $# < 2 ]]; then
+    echo "Usage: cpmkdir source_files... dir1/dir2/.../"
+  else
+    firsts=( )
+    dir_path=${!#}
+    mkdir -p $dir_path && \
+    cp "$@"
+  fi
+}
+function mvmkdir {
+  if [[ $# < 2 ]]; then
+    echo "Usage: mvmkdir source_file dir1/dir2/.../"
+  else
+    #dirs=`dirname $2`
+    dirs=$2
+    mkdir -p $dirs && \
+    mv "$@"
+  fi
+}
 
 alias vimo='vimopen'
 
@@ -57,16 +99,28 @@ alias vimo='vimopen'
 # Unfortunately, this doesn't work, so I moved this command wrapper into a shell script
 #alias inst='echo "sudo apt-get install" $1; sudo apt-get install $1'
 alias uninst='sudo apt-get remove $1'
-alias ginst='sudo gem install --no-rdoc'
-alias ginst1.8='sudo gem1.8 install --no-rdoc'
-alias guninst='sudo gem uninstall'
+#alias ginst='sudo gem install --no-rdoc'
+function ginst {
+  # Show what version was installed already so that we know if the new version is the same as or an upgrade from the existing one (if any)
+  gem list "$@"
+  #sudo gem install --no-rdoc "$@"
+  gem install --no-ri --no-rdoc "$@"
+}
+#alias ginst1.8='sudo gem1.8 install --no-rdoc'
+#alias guninst='sudo gem uninstall'
+alias guninst='gem uninstall'
+#alias guninst1.8='sudo gem1.8 uninstall'
 
-alias useruby1.9='sudo ln -sf ruby1.9.1 /usr/bin/ruby'
-alias useruby1.8='sudo ln -sf ruby1.8 /usr/bin/ruby'
+#alias useruby1.9='sudo ln -sf ruby1.9.1 /usr/bin/ruby'
+#alias useruby1.8='sudo ln -sf ruby1.8 /usr/bin/ruby'
+alias useruby1.9='sudo ln -sf /usr/bin/ruby1.9.1 /usr/local/bin/ruby; sudo ln -sf /usr/bin/irb1.9.1 /usr/local/bin/irb; sudo ln -sf /usr/bin/rake1.9.1 /usr/local/bin/rake; sudo ln -sf /usr/bin/gem1.9.1 /usr/local/bin/gem'
+alias useruby1.8='sudo ln -sf /usr/bin/ruby1.8 /usr/local/bin/ruby;   sudo ln -sf /usr/bin/irb1.8   /usr/local/bin/irb; sudo ln -sf /usr/bin/rake1.8   /usr/local/bin/rake; sudo ln -sf /usr/bin/gem1.8   /usr/local/bin/gem'
 
 alias asbob='sudo -u bob'
 
 alias mozrepl='rlwrap telnet localhost 4242'
+
+alias edhosts='sudo vim /etc/hosts'
 
 #------------------------------------------
 # git
@@ -124,7 +178,7 @@ alias n='nautilus . &'
 
 #------------------------------------------
 # Jobs
-alias j='jobs'
+alias j='jobs -l'
 
 alias f='fg'
 alias 1='fg 1'
@@ -172,7 +226,7 @@ alias hgrep='history|grep '	# List all command lines containing the search term.
 alias hgrep2='cat ~/.bash_history|grep '	# use full history
 function hgrep3 {
   # use backups of full history
-	cgrep "$1" ~/backups/bash_history/
+	cgrep "$1" /backups/small/bash_history/
 }
 
 # TODO: hg-menu: let you choose history item with arrow keys
@@ -200,7 +254,7 @@ alias l="ls -p --color=auto -1"
 
 #       -l     use a long listing format
 #
-alias ll="l -Al"
+alias ll="l -al"
 
 #alias ls="l"
 #alias lla="ls --color -la"
@@ -274,7 +328,7 @@ alias cdwhich=pushdwhich
 alias pdwhich=pushdwhich
 
 #alias lwhich='ls -al \`which\`'
-function lwhich {
+function lswhich {
 	which $1
 	ls -al `which $1`
 }
