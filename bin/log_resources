@@ -30,34 +30,43 @@ function header() {
 }
 
 mkdir -p ${log_resources_dir}
-now=`date +%Y%m%dT%H%M`
+
+#now=`date +%Y%m%dT%H%M`
+now=`date '+%Y-%m-%d %H:%M'`
+
 #export TERM=linux      # may be needed to trick top to display nicely?
 
+#---------------------------------------------------------------------------------------------------
 #echo df
 file=${log_resources_dir}/df
 header $file
-df >> $file
+df 2>/dev/null >> $file
 
+#---------------------------------------------------------------------------------------------------
 #echo uptime
 file=${log_resources_dir}/uptime
 header $file
 uptime >> $file
 
+#---------------------------------------------------------------------------------------------------
 #echo pstree
 file=${log_resources_dir}/pstree
 header $file
 pstree >> $file
 
+#---------------------------------------------------------------------------------------------------
 #echo ps
 file=${log_resources_dir}/ps
 header $file
 ps aux >> $file
 
+#---------------------------------------------------------------------------------------------------
 #echo free
 file=${log_resources_dir}/free
 header $file
-free -m -o >> $file
+free -m >> $file
 
+#---------------------------------------------------------------------------------------------------
 #echo top
 file=${log_resources_dir}/top
 header $file
@@ -65,3 +74,7 @@ top -b -n1 | head -n 25 >> $file
 #top -b -n1 | head -n 17 | sed 's/\[H//g'  | sed 's/\[6;1H//g' >> $file
                        # /\ removes the codes which position the cursor at the top of screen
 
+#---------------------------------------------------------------------------------------------------
+#file=${log_resources_dir}/mounts_list
+#header $file
+#/home/tyler/public/shell/bin/mounts_list >> $file
