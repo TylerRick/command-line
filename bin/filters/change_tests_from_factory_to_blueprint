@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+# a filter/pipeline command
+# TODO:
+# * refactor to something more general
+
+def usage
+  puts <<End
+Usage: stdin | #{File.dirname($0)}
+
+End
+  exit
+end
+
+usage if ARGV[0] == '-h'
+
+#---------------------------------------------------------------------------------------------------
+require 'active_support'
+
+#pattern = '(\w*)'
+#pattern = '(step\d)_(lead)'
+#
+#STDIN.each_line do |line|
+#  puts line.gsub(/Factory.create\(:#{pattern}\)/) {
+#    p $1
+#    $1.camelize + ".make(#{$1}"
+#  }
+#end
+
+patterns = [
+  ['(step)(\d)_(lead)', lambda{('web_design_'+$3).camelize + ".make(:#{$1}#{$2.to_i+1})"}]
+]
+
+STDIN.each_line do |line|
+  if patterns.detect { |(pattern, replacement)| line =~ /Factory.create\(:#{pattern}\)/ }
+    patterns.each do |(pattern, replacement)|
+      if line =~ /Factory.create\(:#{pattern}\)/
+        puts line.gsub(/Factory.create\(:#{pattern}\)/) {
+          replacement.call
+        }
+      end
+    end
+  else
+    puts line
+  end
+end
+
+
+

@@ -1,0 +1,10 @@
+#!/usr/bin/ruby
+
+require 'quality_extensions/string/shell_escape'
+
+input = STDIN.read
+
+input.lines.each do |line|
+  puts line.chomp.shell_escape
+end
+
