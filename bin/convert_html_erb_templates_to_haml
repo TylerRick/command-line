@@ -1,28 +1,51 @@
 #!/usr/bin/ruby
 
 #---------------------------------------------------------------------------------------------------
-def usage
-  puts <<End
-Usage: #{File.basename(__FILE__)} [options] dir 
-End
-  exit
-end
+# Parse args
 
-usage if ARGV.size < 1
+require 'optparse'
 
-#---------------------------------------------------------------------------------------------------
-# Parse options
-
-base_dir = ARGV[0]
-
-options = {
+@options = {
   :compare_files        => true, # useful to fix things that html2haml misses, like:
     # *the contents of 'form_for do' and 'if' are not indented as they should be (and the useless '- end' is retained)
     # *the contents of my multi-line sections (<%= %>)/tags (javascript_tag, etc.) blocks are all stripped of newlines and put on a single line (which I then have to undo and add | continuation lines
     # (and \n at the end of comment lines, since internally HAML still strips newlines, for some reason!!!)
     # *blank lines you want to keep are thrown away
-  :delete_after_compare => true,
+  :delete_after_compare => false,
+  :recursive            => false,
 }
+
+def parse_args
+  @args = ARGV
+  @args.options do |opts|
+    opts.banner = <<End
+Usage: #{File.basename($0)} [options] files 
+Usage: #{File.basename($0)} [options] -r dir
+End
+
+    opts.on("-r", "--recursive", "Recursive")                                            { @options[:recursive] = true }
+    opts.on("-v", "--verbose", "Be more verbose")                                        { @options[:verbose] = true }
+    opts.on("-c", "--compare", "Compare files in vimdiff after conversion")              { @options[:compare] = true }
+    opts.on("-C", "--no-compare", "Don't compare files in vimdiff after conversion")     { @options[:compare] = false }
+    opts.on("-d", "--delete", "Delete .erb/.rhtml file after conversion and (if --compare) comparison.\n" +
+                              "(If --compare, you can skip deletion for a file, by exiting the comparison program with a non-zero exit code (in vim, use cquit)") \
+                              { @options[:delete_after_compare] = true }
+
+    opts.separator ""
+    opts.on("-h", "--help", "Show this help message.")    { puts opts; exit }
+
+    opts.parse!
+  end
+end
+parse_args
+
+if ARGV.size == 0
+  # TODO: is there a less hackish way to do this?
+  ARGV.unshift '--help'
+  parse_args
+end
+
+@paths = ARGV.dup
 
 #---------------------------------------------------------------------------------------------------
 # Main
@@ -36,21 +59,37 @@ class HtmlErbToHaml
   
   def convert
     file = @file
-    outfile = file.
-              gsub(/\.erb$/, '.haml').
-              gsub(/\.rhtml$/, '.html.haml')
+    if file =~ /\.erb$|\.rhtml$/
+      outfile = file.
+                gsub(/\.erb$/, '.haml').
+                gsub(/\.rhtml$/, '.html.haml')
+    else
+      outfile = file + '.haml'
+    end
+
     if Pathname.new(outfile).exist?
       puts "#{outfile} already exists! Skipping..."
     else
       system %(html2haml -rx #{file} #{outfile})
       system %(vim -O #{file} #{outfile})  if @options[:compare_files]
-      system %(rm #{file})                 if @options[:delete_after_compare]
+      if $?.success?
+        system %(rm #{file})                 if @options[:delete_after_compare]
+        puts "New file: #{outfile}" if @options[:verbose]
+        return true
+      end
     end
   end
 end
 
-# or .rhtml
-Dir["#{base_dir}/**/*.{erb,rhtml}"].each do |file|
-  HtmlErbToHaml.new(file, options).convert
+result = true
+for path in @paths do
+  if @options[:recursive]
+    Dir["#{path}/**/*.{erb,rhtml}"].each do |file|
+      result &&= HtmlErbToHaml.new(file, @options).convert
+    end
+  else
+    result &&= HtmlErbToHaml.new(path, @options).convert
+  end
 end
+exit result
 
