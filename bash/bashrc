@@ -99,12 +99,19 @@ alias vimo='vimopen'
 # Unfortunately, this doesn't work, so I moved this command wrapper into a shell script
 #alias inst='echo "sudo apt-get install" $1; sudo apt-get install $1'
 alias uninst='sudo apt-get remove $1'
+
 #alias ginst='sudo gem install --no-rdoc'
 function ginst {
   # Show what version was installed already so that we know if the new version is the same as or an upgrade from the existing one (if any)
-  gem list "$@"
+  #gem list "$@"
+  gem list -d "$@"
+
   #sudo gem install --no-rdoc "$@"
-  gem install --no-ri --no-rdoc "$@"
+  #gem install --no-ri --no-rdoc "$@"
+  echo
+  command="rvm 192@global gem install"
+  echo $command "$@"
+  $command "$@"
 }
 #alias ginst1.8='sudo gem1.8 install --no-rdoc'
 #alias guninst='sudo gem uninstall'
