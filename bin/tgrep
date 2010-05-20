@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+  cat - <<End
+Usage: `basename $0` <args>
+
+This is simply an alias/wrapper for:
+grep --binary-files=text "\$@"
+End
+  exit 1
+fi
+
+grep --binary-files=text "$@"
