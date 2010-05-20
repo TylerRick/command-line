@@ -1,10 +1,9 @@
 #!/bin/bash
-# ~/public/shell/devscripts_bin/SearchResultsLineToVimSessionLineConverter.py
 # Pipe a list of files or cgrep-style "search results lines" to this script and it will open them in vim
 
 mkdir -p ~/temp
 
-converter=~/public/shell/devscripts_bin/SearchResultsLineToVimSessionLineConverter.py
+converter=$TylerScriptsPath/devscripts_bin/SearchResultsLineToVimSessionLineConverter.py
 if [ ! -e $converter ]; then
   echo "Missing $converter"
   exit 1;

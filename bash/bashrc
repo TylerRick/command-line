@@ -7,19 +7,23 @@
 #---------------------------------------------------------------------------------------------------
 # Paths
 
+[ -z $TylerScriptsPath ] && export TylerScriptsPath=$HOME/installed/command-line
+[ -z $TylerGitPath ]     && export     TylerGitPath=$HOME/installed/tyler-git
+
 # todo: only add paths that aren't already there, so that it's safe to source this file multiple times
 export PATH=\
 ~/bin:\
 ~/bin/macros:\
-~/public/shell/bin:\
-~/public/shell/bin/ruby:\
-~/public/shell/bin/rails:\
-~/public/shell/bin/filters:\
-~/public/shell/devscripts_bin/:\
+$TylerScriptsPath/bin:\
+$TylerScriptsPath/bin/ruby:\
+$TylerScriptsPath/bin/rails:\
+$TylerScriptsPath/bin/filters:\
+$TylerScriptsPath/devscripts_bin/:\
 ~/public/ruby/bin:\
 $PATH
 
 . paths.d.parse
+#. $TylerScriptsPath/bin/paths.d.parse
 
 #if doesn't already include it:
   export PATH=$PATH:`gem env gemdir`/bin
@@ -133,7 +137,7 @@ alias edhosts='sudo vim /etc/hosts'
 
 #------------------------------------------
 # git
-source ~/dev/git/tyler-git/sh/git_commands
+source $TylerGitPath/sh/git_commands
 
 #------------------------------------------
 # svn
@@ -272,12 +276,12 @@ alias ll="l -al"
 
 # This lets you change directories and list the contents of the directory you just changed into in
 # one command.
-alias cdl='source ~/public/shell/bin/cdl.sh' 
+alias cdl='source $TylerScriptsPath/bin/cdl.sh' 
 alias cdd='cdl'
 
-alias mkdircd='source ~/public/shell/bin/mkdircd' 
-#alias     mdc='source ~/public/shell/bin/mkdircd' 
-alias     cdf='source ~/public/shell/bin/mkdircd' # "cd --force" :)
+alias mkdircd='source $TylerScriptsPath/bin/mkdircd' 
+#alias     mdc='source $TylerScriptsPath/bin/mkdircd' 
+alias     cdf='source $TylerScriptsPath/bin/mkdircd' # "cd --force" :)
 
 
 #------------------------------------------
@@ -356,9 +360,9 @@ function vimgemwhich {
 #------------------------------------------
 # Aliases for bash config files
 alias bashprofile=' vim ~/.bash_profile;                  source ~/.bash_profile'
-alias bashprofilep='vim ~/public/shell/bash/bash_profile; source ~/.bash_profile'
+alias bashprofilep='vim $TylerScriptsPath/bash/bash_profile; source ~/.bash_profile'
 alias bashrc='     vim ~/.bashrc;                  source ~/.bash_profile'
-alias bashrcp='    vim ~/public/shell/bash/bashrc; source ~/.bash_profile'
+alias bashrcp='    vim $TylerScriptsPath/bash/bashrc; source ~/.bash_profile'
 
 #alias cdfses='cd ~/.mozilla/firefox/Tyler/sessions; ll -t'
 alias cdfses='cd ~/.mozilla/firefox/Tyler/sessions; firefox_session_list'

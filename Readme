@@ -1,0 +1,6 @@
+How to install:
+
+mkdir ~/installed
+cd $_
+git clone git://github.com/TylerRick/command-line.git
+script/install

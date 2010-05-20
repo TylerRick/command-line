@@ -1,23 +1,23 @@
 #!/bin/bash
 
-# svn checkout this to, for example, ~/installed/tyler-shell and then run script/install
-
 cd `dirname $0`/..
-package_dir=`bin/realpath .`
+package_dir=`bin/realpath .` || { echo 'Error running realpath. Please fix and try again.'; exit 127; }
 #echo $package_dir
 
 touch ~/.bashrc
 grep "bash/bashrc" ~/.bashrc > /dev/null
 if [[ "$?" == "1" ]]; then
 	echo "Installing bash/bashrc"
-	echo "source $package_dir/bash/bashrc" >> ~/.bashrc
+	echo "export TylerScriptsPath=$package_dir" >> ~/.bashrc
+	echo "source \$TylerScriptsPath/bash/bashrc" >> ~/.bashrc
 fi
 
 touch ~/.bash_profile
 grep "bash/bash_profile" ~/.bash_profile > /dev/null
 if [[ "$?" == "1" ]]; then
 	echo "Installing bash/bash_profile"
-	echo "source $package_dir/bash/bash_profile" >> ~/.bash_profile
+	echo "export TylerScriptsPath=$package_dir" >> ~/.bashrc
+	echo "source \$TylerScriptsPath/bash/bashrc" >> ~/.bashrc
 fi
 
 touch ~/.bash_logout
@@ -29,19 +29,18 @@ fi
 
 pushd dotfiles >/dev/null
 for dotfile in .??* ; do
-	[[   -e ~/$dotfile ]]                  && echo "~/$dotfile already exists'" && diff ~/$dotfile $package_dir/dotfiles/$dotfile
-	[[ ! -e ~/$dotfile || -L ~/$dotfile ]] && ln -sf $package_dir/dotfiles/$dotfile ~/$dotfile 
+	[[   -e ~/$dotfile && ! -L ~/$dotfile ]] && { echo "~/$dotfile already exists and is not a symlink."; ls -l ~/$dotfile; echo 'Diff:'; diff ~/$dotfile $package_dir/dotfiles/$dotfile; echo; }
+	[[ ! -e ~/$dotfile || -L ~/$dotfile ]]   && ln -sf $package_dir/dotfiles/$dotfile ~/$dotfile 
 done
 popd >/dev/null
-exit
 
 mkdir -p ~/.paths.d
 
 mkdir -p ~/installed
 pushd    ~/installed
-git clone git://github.com/TylerRick/ruby-git.git
-git clone git://github.com/TylerRick/tyler-git.git
-git clone git://gitorious.org/willgit/mainline.git/ willgit
+[[ -d ruby-git ]]  || git clone git://github.com/TylerRick/ruby-git.git
+[[ -d tyler-git ]] || git clone git://github.com/TylerRick/tyler-git.git
+[[ -d willgit ]]   || git clone git://gitorious.org/willgit/mainline.git/ willgit
 popd
 
 echo '~/installed/tyler-git/bin' > ~/.paths.d/tyler-git
