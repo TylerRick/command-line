@@ -5,7 +5,10 @@
 to_install=to_install
 already_installed=already_installed
 
-gem1.8 list | cut -d ' ' -f1 > $to_install
+#gem1.8 list | cut -d ' ' -f1 > $to_install
+#ls /var/lib/gems/1.9.1/gems/ | sed 's/-[0-9].*$//' > $to_install
+ls /var/lib/gems/1.8/gems/ | sed 's/-[0-9].*$//' > $to_install
+
 gem    list | cut -d ' ' -f1 > $already_installed
 
 while read gem && [[ $gem != end ]]
@@ -16,7 +19,8 @@ do
 	else
 		echo
 		echo "$gem is NOT installed."
-		echo sudo gem install --no-rdoc "$gem"
-		#sudo gem install --no-rdoc "$gem"
+		#echo sudo gem install --no-rdoc "$gem"
+		echo gem install --no-rdoc "$gem"
+		     gem install --no-rdoc "$gem"
 	fi
 done <$to_install
