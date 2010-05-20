@@ -18,8 +18,11 @@ class SearchResultsLineToVimSessionLineConverter:
 			if line != "":
 				cgrepLine = SearchResultsLine(line)
 				if cgrepLine.parse()["filename"] not in fileNameToVimLine:
-					escaped_filename = re.sub(" ", '\ ', cgrepLine.parse()["filename"])
-					vimLine = "badd +" + cgrepLine.parse()["line"] + " " + escaped_filename
+					path_prefix = os.getcwd() + '/'
+					path_prefix = ''
+					escaped_filename = re.sub(" ", '\ ', path_prefix + cgrepLine.parse()["filename"])
+					#vimLine = "badd +" + cgrepLine.parse()["line"] + " " + escaped_filename
+					vimLine = "tabedit +" + cgrepLine.parse()["line"] + " " + escaped_filename
 					vimLines = vimLines + vimLine + "\n"
 
 					fileNameToVimLine.update({cgrepLine.parse()["filename"] : vimLine})
@@ -27,7 +30,8 @@ class SearchResultsLineToVimSessionLineConverter:
 
 		if len(fileNameToVimLine) > 0:
 			# For some reason buffer 1 is [No File] so let's just jump to buffer 2, shall we?
-			vimLines = vimLines + "b2" + "\n"
+			#vimLines = vimLines + "b2" + "\n"
+			vimLines = vimLines + "tabrewind | bw" + "\n"
 			# Jump to the correct line of the first file, because otherwise it sometimes remembers where you were the last time you were in there and ignores the "+line"
 			vimLines = vimLines + "execute \":" + str(lineForFirstFile) + "\"" + "\n"
 
