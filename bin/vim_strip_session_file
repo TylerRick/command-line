@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+
+raise "Usage: #{File.basename(__FILE__)} session.vim" unless ARGV[0]
+
+#---------------------------------------------------------------------------------------------------
+require 'tempfile'
+require 'pathname'
+tmp = Tempfile.new(File.basename(__FILE__))
+
+out = tmp.open
+counts = {}
+Pathname.new(ARGV[0]).open('r').each_line do |line|
+  if line =~ /SessionLoad|^cd|^badd|^args|^edit|^tabedit/
+    counts[$&] ||= 0
+    if $& == 'edit' && counts[$&] >= 1
+      next
+    end
+    #puts $&
+    out.puts line
+    counts[$&] += 1
+  end
+end
+out.close
+
+out_file = ARGV[0] + 'out'
+FileUtils.cp tmp.path, out_file
+puts "To open: vim -S #{out_file}"
+
+#---------------------------------------------------------------------------------------------------
