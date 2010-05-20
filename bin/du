@@ -1,4 +1,5 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
+#!/usr/bin/ruby -W0
 
 # to do:
 # tee output so it's real-time
