@@ -3,6 +3,7 @@
 	email = github.com@tylerrick.com
 [branch "master"]
 [color]
+	ui = true
 	diff = auto
 	status = auto
 	branch = auto
@@ -24,6 +25,8 @@
 	autosetupmerge = true
 [core]
 	excludesfile = /home/tyler/.gitignore
+	#whitespace = trailing-space,space-before-tab,indent-with-non-tab
+	whitespace = trailing-space,space-before-tab
 
 #[merge]
 #  tool = vimdiff
