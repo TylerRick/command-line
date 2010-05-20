@@ -1,0 +1,3 @@
+# To do:
+# * allow override our default with -nwhatever
+tail "$@" -n300 | less
