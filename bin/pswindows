@@ -1,3 +1,4 @@
 #!/bin/sh
 
-wmctrl -lp|gawk '{print $3}'|xargs ps
+#wmctrl -lp|gawk '{print $3}'
+wmctrl -lp|gawk '{print $3}'| grep -v '^0$' | xargs ps
