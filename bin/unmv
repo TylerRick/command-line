@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+
+def usage
+  puts <<End
+Usage: #{File.basename($0)} source dest
+
+Reverses a mv command, so that all you have to do to undo command mv a b, is to go up in your command history to the mv command and prefix with 'un'.
+
+This is usually much easier and faster than retyping both paths or copying and pasting.
+
+> mv a b
+> unmv a b
+End
+end
+usage if ARGV.size == 0
+
+if ARGV.any? {|arg| arg =~ /^-/} || ARGV.size > 2
+  fail "Error: You have options specified. This isn't supported yet."
+end
+
+puts command = %(mv "#{ARGV[1]}" "#{ARGV[0]}")
+system command
