@@ -1,0 +1,33 @@
+#!/usr/bin/ruby
+
+def usage
+  puts <<-End
+Usage: #{File.basename($0)} target_of_symlink
+
+Creates a symlink to <target_of_symlink>, removing spaces (and other unsafe characters?) so that you can open the target (via the symlink) in programs that don't like spaces in path names (like vim?).
+
+Optionally (default: true), prefix symlink name with '.' so that it doesn't interfere with tab completion when trying to access the main, canonical path.
+
+> mkdir 'My files'
+
+> lnnospaces 'My files'
+ln -s 'My files' .My_files
+  End
+  exit 1
+end
+usage unless ARGV.size == 1
+
+@options = {
+  :verbose => true,
+  :prefix_with_dot => true,
+}
+
+target = ARGV[0]
+symlink_name = target.gsub(/ /, '_')
+symlink_name = '.' + symlink_name if @options[:prefix_with_dot]
+
+command = "ln -s '#{target}' #{symlink_name}"
+puts "#{command}" if @options[:verbose]
+system command
+
+#---------------------------------------------------------------------------------------------------
