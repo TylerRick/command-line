@@ -1,5 +1,7 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
 # See also its predecessor, ~/public/shell/devscripts_bin/cgrep
+# To do:
+# * parse .cgrep_rc config file in current directory or parents, which may have additional patterns to exclude or other per-tree settings
 
 #---------------------------------------------------------------------------------------------------
 # Parse args
@@ -27,6 +29,14 @@ def parse_args
   @args.options do |opts|
     opts.banner = <<End
 Usage: #{File.basename($0)} search_term [directory] [grep_options] [find_predicates] [find_options]
+
+All of grep's normal options are supported:
+-l, --files-with-matches
+etc.
+
+Extra grep options:
+--no-line-number -- don't add --line-number (added by default)
+--no-filename -- don't add --filename (added by default)
 End
 
     #opts.on("-a", "--text", "")         { @options[:binary_files] = :text }
@@ -59,7 +69,7 @@ parse_args
 #end
 
 if ARGV.size == 0
-  # TODO: is there a less hacking way to do this?
+  # TODO: is there a less hackish way to do this?
   ARGV.unshift '--help'
   parse_args
 end
@@ -67,6 +77,7 @@ end
 search_term     = ARGV.shift
 directory       = ARGV.shift || './'
 grep_options    = (ARGV.shift||'').split(' ')
+#p grep_options; exit
 find_predicates = (ARGV.shift||'').split(' ')
 find_options    = (ARGV.shift||'').split(' ')
 
@@ -81,15 +92,29 @@ input_files_are_utf16 = false
 #---------------------------------------------------------------------------------------------------
 # Main
 
+require 'pathname'
+require 'rubygems'
+gem 'quality_extensions'
+require 'quality_extensions/string/prefix'
 require 'quality_extensions/string/prefix_lines'
 require 'quality_extensions/enumerable/map_with_index'
 
-grep_options << '--binary-files=without-match' unless (grep_options & ['-a', '--text', '--binary-files']).any?
-grep_options << '--color'          unless (grep_options & ['--no-color']).any?
-grep_options << '--with-filename'  unless (grep_options & ['-h', '--no-filename']).any? || input_files_are_utf16
+basename = Pathname.new(directory).basename
 
-find_predicates << '\( -type f -regex ".*\.\(swp\|tmp\|log\|min.js\|pack.js\|schema\|sql\|css\)$" -prune \)'
+grep_options << '--binary-files=without-match' unless (grep_options & ['-a', '--text', '--binary-files']).any?
+grep_options << '--color'          unless grep_options.delete('--no-color')
+grep_options << '--with-filename'  unless (grep_options & ['-h', '--no-filename']).any? || input_files_are_utf16
+grep_options << '--line-number'    unless grep_options.delete('--no-line-number')
+
+#\|css
+find_predicates << '\( -type f -regex ".*\.\(swp\|tmp\|log\|min.js\|pack.js\|schema\|sql\|sqldump\|svnbase\)$" -prune \)'
+find_predicates << '\( -type d -name tmp -prune \)'
+find_predicates << '\( -type d -name public -prune \)'
 find_predicates << '\( -type d -name .git -prune \)'
+find_predicates << '\( -type d -name .svn -prune \)'
+find_predicates << '\( -type d -name rails -prune \)' unless basename.to_s == 'rails'
+find_predicates << '\( -type d -name gems -prune \)' unless basename.to_s == 'gems'
+#find_predicates << '\( -type d -name vendor -prune \)'
 #find_predicates << '-print'
 
 if input_files_are_utf16
