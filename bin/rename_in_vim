@@ -1,0 +1,20 @@
+# select files in nautilus
+# invoke "Rename in Vim" command
+# it saves a copy of the original file list with original filenames, and opens another copy for you to make edits to
+
+# open up the original list beside it with modifiable off and sync on (like vimdiff), so you can compare new to originals
+# esp important if moving lines around to double check that you didn't create an off-by-1 bug
+# (see how fugitive plugin works)
+
+# make edits
+# save file list
+
+# compares originals to new, line by line
+# if line count differs, error
+# ??if Levenshtein/edit difference is high, give warning?
+# renames are applied
+
+# leave a line blank (cc in vim) to delete it?
+# you can also swap filenames with another file by exchanging their lines
+#   this script needs to be smart enough to move to temp filename first to avoid conflicts during swap
+
