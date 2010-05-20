@@ -1,0 +1,4 @@
+# $1 = foo.mp3
+echo ffmpeg -i "$1" -y -vn  -f wav -ac 2 "${1%%.*}".wav
+     ffmpeg -i "$1" -y -vn  -f wav -ac 2 "${1%%.*}".wav
+
