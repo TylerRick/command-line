@@ -1,10 +1,11 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
 
 # Name ideas:
 # * lsdisks, lsmounts, list_drives, mounts, disks
 # * mounts_list is too long!
 
 # To do:
+# * list partitions that exist but aren't mounted! (parted?)
 # * Don't pad the last column with space (or if we do, make sure the space comes *after* the color, so that strip works)
 # * Switch to optparse
 # * Also show output from parted -l (way too slow), hddtemp, smartctl, tune2fs (% of reserved space)
@@ -22,12 +23,24 @@
 #-------------------------------------------------------------------------------
 def usage
   puts <<End
-Options:
-  -d, --device -- groups by device, and shows model name/serial number/disk capacity of each physical device
 
-    Warning: This currently attempts to run blkid, fdisk -l, and hdparm -i with sudo, which may prompt for a password.
-    Presently this command will not pass on the password prompt to you but will just sit there.
-    It is recommended that you add those commands to your sudoers file with NOPASSWD so that it won't prompt for a password.
+Warning: This currently attempts to run blkid, fdisk -l, and hdparm -i with sudo, which may prompt for a password.
+This command may not pass on the password prompt to you but will just sit there.
+It is recommended that you add those commands to your sudoers file with NOPASSWD so that it won't prompt for a password.
+
+username   ALL = NOPASSWD: \
+              ...
+              /usr/bin/du, \
+              /bin/df, \
+              /usr/sbin/smartctl, \
+              /usr/sbin/hddtemp, \
+              /sbin/vol_id, \
+              /sbin/hdparm, \
+              /sbin/blkid, \
+              /sbin/fdisk -l, \
+
+Options:
+  -d, --device -- groups by device, and shows model name/serial number/disk capacity of each physical device (this is now the default)
 
   --no-color   -- disable color
 End
@@ -38,12 +51,15 @@ end
 require 'ostruct'
 require 'pathname'
 require 'rubygems'
+#gem 'facets'
 require 'facets'
+#gem 'colored'
 require 'colored'
 require 'facets/blank'
 require 'facets/array/delete_values'
 require 'facets/symbol/to_proc'
 require 'facets/class/cattr_accessor'
+#gem 'quality_extensions'
 require 'quality_extensions/string/with_knowledge_of_color'
 require 'quality_extensions/safe_nil'
 require 'quality_extensions/helpers/numbers'
@@ -202,7 +218,7 @@ class DfParser
 
   def run_command
     @block_size = 'kB'
-    `df --block-size=#{@block_size}`.chomp
+    `df --block-size=#{@block_size} 2>/dev/null`.chomp
   end
 
   def parse
