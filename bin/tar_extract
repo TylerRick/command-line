@@ -40,3 +40,6 @@ elsif $?.exitstatus == 1
     system "mv '#{filename}' ../"
   end
 end
+system "ls #{filename.gsub(/\.tar(\.gz)?/, '')}"
+print "Delete #{filename}?"
+puts

@@ -31,8 +31,13 @@ usage if ARGV.size == 0
 #-------------------------------------------------------------------------------
 require 'facets'
 
-contents = `unzip -l #{ARGV[0]}`.lines.to_a
-header_row, contents = contents[1], contents[3..-3]
+contents = `unzip -l #{ARGV[0]}`.lines #.to_a
+#p contents.grep_with_index(/^\s*Length\s*Date\s*Time\s*Name\s*$/)
+discard, i = contents.with_index.find {|el, i|
+  [el, i] if el =~ /^\s*Length\s*Date\s*Time\s*Name\s*$/
+}
+contents = contents.to_a
+header_row, contents = contents[i], contents[i+2..-3]
 
 md = header_row.match(/.*(Name)/)
 name_col_offset = md.begin(1)

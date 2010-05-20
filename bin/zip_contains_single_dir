@@ -16,12 +16,16 @@ Usage: #{File.basename($0)} file.zip
 By default, it assumes it is being used in a script and therefore communicates its result via its exit code:
 Exits with 0 if the contents of the zip file are all contained within a single directory.
 Exits with 1 if the contents of the zip file, when extracted, would clutter your working directory with a bunch (>1) of files/directories because whoever created the zip was an idiot and didn't follow the considerate practice of making zip files that, when extracted, leave you with a directory named the same as the zip (except without the .zip extension).
+Exits with 2 if the contents of the zip file (after removing useless __MACOSX dir) are all contained within a single directory.
 
 If you'd rather see the result on stdout, just pass the -v/--verbose option.
+
+TODO: make verbose default and -q if you only want exit code
 End
 
-    opts.on("-v", "--verbose", "Be more verbose")                                                                       { @options[:verbose] = true }
+    opts.on("-m", "--macosx-dirs-are-useless", "Pretend __MACOSX dirs don't exist. If the archive contains only a __MACOSX dir and another dir X, only dir X is considered.") { @options[:macosx_dirs_are_useless] = true }
     opts.separator ""
+    opts.on("-v", "--verbose", "Be more verbose")                                                                       { @options[:verbose] = true }
     opts.on("-h", "--help", "Show this help message.")                                                                  { puts opts; exit }
     opts.parse!
   end
@@ -29,7 +33,6 @@ end
 parse_args
 
 if ARGV.size == 0
-  # TODO: is there a less hacking way to do this?
   ARGV.unshift '--help'
   parse_args
 end
@@ -39,7 +42,9 @@ end
 #-------------------------------------------------------------------------------
 # Main
 require 'pathname'
+require 'facets/class/to_proc'
 require 'quality_extensions/enumerable/all_same'
+#require 'quality_extensions/pathname'
 
 class Pathname
   def parts
@@ -52,22 +57,42 @@ class Pathname
   end
 end
 
-contents = `zip_file_list #{ARGV[0]}`
+contents = `zip_file_list #{ARGV[0]}`.lines.map(&:chomp).sort.map(&Pathname)
 exit_code = $?.exitstatus if !$?.success?
 
-prefixes = contents.lines.map {|path|
-  Pathname.new(path).parts[0]
+prefixes = contents.map {|path|
+  path.parts[0]
 }.uniq
 
-exit_code = prefixes.all_same? ? 0 : 1
+removed_macosx_dirs = false
+if @options[:macosx_dirs_are_useless]
+  prefixes.reject! {|path|
+    if path == '__MACOSX'
+      removed_macosx_dirs = true
+      true
+    end
+  }
+  contents.reject! {|path|
+    path.parts.include? '__MACOSX'
+  }
+end
+
+case
+when !removed_macosx_dirs &&  prefixes.all_same?; exit_code = 0
+when !removed_macosx_dirs && !prefixes.all_same?; exit_code = 1
+when  removed_macosx_dirs &&  prefixes.all_same?; exit_code = 2
+when  removed_macosx_dirs && !prefixes.all_same?; exit_code = 1
+end
+#exit_code = prefixes.all_same? ? 0 : 1
 
 if @options[:verbose]
   case exit_code
   when 0
     puts "All files have the same prefix: #{prefixes.first}/"
-  when 0
-    puts "Not all files have the same prefix. Contents:\n#{contents}"
+  when 2
+    puts "After removing __MACOSX dir, all files have the same prefix: #{prefixes.first}/"
+  when 1
+    puts "Not all files have the same prefix. Contents:\n#{contents.join("\n")}"
   end
-else
-  exit exit_code
 end
+exit exit_code
