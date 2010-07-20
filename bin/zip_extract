@@ -38,6 +38,12 @@ if ARGV.size == 0
 end
 
 #-------------------------------------------------------------------------------
+def verbose_system(command)
+  puts command if @options[:verbose]
+  system command
+end
+
+#-------------------------------------------------------------------------------
 require 'pathname'
 
 filename = ARGV[0]
@@ -59,10 +65,14 @@ elsif $?.exitstatus >= 1
     if @options[:macosx_dirs_are_useless]
       puts "Removing useless __MACOSX dir..."
       system "rm -rf '#{dirname}/__MACOSX'" 
-      system "mv '#{dirname}' '#{dirname}.delete'" 
-      system "mv '#{dirname}.delete/#{inner_dir}' ./" 
-      system "rmdir '#{dirname}.delete'" 
-      puts "Extracted contents of #{filename}, which contained single dir #{inner_dir}"
+      if inner_dir
+        verbose_system "mv '#{dirname}' '#{dirname}.delete'" 
+        verbose_system "mv '#{dirname}.delete/#{inner_dir}' ./" 
+        system "rmdir '#{dirname}.delete'" 
+        puts "Extracted contents of #{filename}, which contained single dir #{inner_dir}"
+      else
+        puts "Extracted contents of #{filename} within new directory #{dirname}"
+      end
     else
       puts "Extracted contents of #{filename} within new directory #{dirname}"
     end
