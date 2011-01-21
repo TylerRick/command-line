@@ -1,0 +1,10 @@
+#!/bin/sh
+# compare: chmodfiles chmoddirs
+# chmoddirs a+rx; chmodfiles a+r
+
+# TODO: make it accept path as optional arg1, like find itself; for now you must cd into correct dir
+
+# TODO: -v flag
+#find . -type d -exec ls -ld {} \;
+
+find . -type d -exec chmod "$@" {} \;
